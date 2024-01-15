@@ -5,36 +5,36 @@ SEGMENT_TIME=$(echo $CONFIGURATION | jq -c ".properties.segment_time")
 
 #read from json
 function start {
-	echo "$CONFIGURATION" | jq -c '.cameras[]' | while read i; do
-	  $SCRIPT_DIR/camera_rec $i $SEGMENT_TIME &
-	done
+    echo "$CONFIGURATION" | jq -c '.cameras[]' | while read i; do
+       $SCRIPT_DIR/camera_rec $i $SEGMENT_TIME &
+    done
 }
 
 function stop {
-	killall camera_rec
+    killall camera_rec
 }
 
 running=1
 function on_exit {
-	echo "on exit"
-	running=0
+    echo "on exit"
+    running=0
 }
 trap on_exit INT ABRT KILL TERM
 
 if [ "$1" = "start" ]; then
-	start
+    start
 
-	while [ "$running" == "1" ]; do
-		sleep 1
-	done;
+    while [ "$running" == "1" ]; do
+        sleep 1
+    done;
 
-	echo "Exiting"
-	stop
-	sleep 3
+    echo "Exiting"
+    stop
+    sleep 3
 elif [ "$1" = "stop" ]; then
-	stop
+    stop
 else 
-	echo "Use start or stop"
+    echo "Use start or stop"
 fi
 
 
