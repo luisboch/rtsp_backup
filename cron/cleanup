@@ -1,8 +1,30 @@
 #! /bin/bash
 
-echo "clean up"
+function isValidDate {
+	echo "1: $1, 2: $2"
+}
 
-jq -c '.cameras[]' $CONFIGURATION | while read i; do
-	  dir_name=$(echo $i | jq -r '.directory')
-      
+KEEP_BACKUP=$( echo $CONFIGURATION | jq -r '.properties.keep_backup' )
+KEEP_BACKUP=${KEEP_BACKUP:-10}
+echo $KEEP_BACKUP
+
+find "$DATA_DIR" -type d | while read fullpath; do
+
+	dir="${fullpath/$DATA_DIR/""}"
+	
+	if [  "$(grep -o '/' <<<"$dir" | grep -c .)" -ge "4"  ]; then
+		parts=(${dir///// })
+		d1="${parts[2]}${parts[3]}${parts[4]}"
+		d1=${d1////-}
+		d1=$(date -d $d1 +%s)
+		d2=$(date +%Y-%m-%d)
+		d2=$(date -d $d2 +%s)
+		diff=`expr  $d2 - $d1`
+		diff=`expr $diff / 86400`
+
+		if [ $diff -gt $KEEP_BACKUP ] ; then
+			echo "Removing dir: $fullpath"
+			rm $fullpath
+		fi
+	fi
 done

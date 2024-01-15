@@ -1,7 +1,10 @@
 #! /bin/bash
 
 if [ "$AUTO_CLEANUP_ENABLED" = "true" ]; then
-	echo "*/1	*	*	*	*	/bin/bash /app/cron/cleanup >> /var/log/cleanup.log " > /etc/crontabs/root
+	KEEP_BACKUP=$( echo $CONFIGURATION | jq -r '.properties.keep_backup' )
+	KEEP_BACKUP=${KEEP_BACKUP:-10}
+	echo "We will remove directories older than $KEEP_BACKUP days"
+	echo "1	1	*	*	*	/bin/bash /app/cron/cleanup >> /var/log/cleanup.log " > /etc/crontabs/root
 	crond
 fi
 

@@ -1,11 +1,11 @@
 #! /bin/bash
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-SEGMENT_TIME=$(jq -c ".properties.segment_time" $CONFIGURATION)
+SEGMENT_TIME=$(echo $CONFIGURATION | jq -c ".properties.segment_time")
 
 #read from json
 function start {
-	jq -c '.cameras[]' $CONFIGURATION | while read i; do
+	echo "$CONFIGURATION" | jq -c '.cameras[]' | while read i; do
 	  $SCRIPT_DIR/camera_rec $i $SEGMENT_TIME &
 	done
 }
@@ -16,6 +16,7 @@ function stop {
 
 running=1
 function on_exit {
+	echo "on exit"
 	running=0
 }
 trap on_exit INT ABRT KILL TERM
