@@ -9,7 +9,7 @@ timeout=$(echo ${2:-10})
 if [ $pid = "invalid" ]; then echo "Invalid pid"; exit 0; fi;
 
 function exists {
-	if test -d /proc/"$pid"/; then
+    if test -d /proc/"$pid"/; then
     	echo 1
     else
     	echo 0
