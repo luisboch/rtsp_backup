@@ -1,0 +1,8 @@
+#! /bin/bash
+
+if [ "$AUTO_CLEANUP_ENABLED" = "true" ]; then
+	echo "*/1	*	*	*	*	/bin/bash /app/cron/cleanup >> /var/log/cleanup.log " > /etc/crontabs/root
+	crond
+fi
+
+/app/daemon/daemon start

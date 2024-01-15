@@ -1,0 +1,68 @@
+#! /bin/bash
+
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+function on_exit {
+	running=0
+	echo "Killing $pid"
+	$SCRIPT_DIR/close_pid $pid &
+}
+
+trap on_exit INT ABRT KILL TERM
+
+alias=$(echo $1 | jq -r '.alias')
+dir_name=$(echo $1 | jq -r '.directory')
+url=$(echo $1 | jq -r '.url')
+segment_time=$(echo ${2:-10})
+base_dir="$DATA_DIR/$dir_name"
+
+echo "$alias: Making backup from $alias to $base_dir, using segment time of $segment_time secs"
+
+pid=0
+running=1
+
+function make_segment_backup {
+	out_dir="$base_dir/$(date +%Y)/$(date +%m)/$(date +%d)"
+	mkdir -p $out_dir
+	ffmpeg -hide_banner -y \
+	-loglevel error \
+	-rtsp_transport tcp \
+	-use_wallclock_as_timestamps 1 \
+	-i "$url" \
+	-vcodec copy \
+	-acodec copy \
+	-strftime 1 \
+	-metadata "title=Record:$dir_name" \
+	$out_dir/$(date +%H-%M-%S).mkv &
+	
+	# store last pid to allow cleaning on shutdonw
+	pid=$!
+	
+	wait_for_time $segment_time
+	$SCRIPT_DIR/close_pid $pid &
+}
+
+
+function wait_for_time {
+	s=0
+	while [ $s -lt $segment_time ]; do
+		sleep 1
+		s=`expr $s + 1`
+		if [ "$running" == "0" ]; then
+			break;
+		fi
+	done
+}
+
+
+while [ "$running" == "1" ]; do
+	echo "$alias: calling segment_backup..."
+    make_segment_backup
+done;
+
+echo "$alias: Stopped $running"
+
+
+
+

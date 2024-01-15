@@ -1,0 +1,35 @@
+#! /bin/bash
+
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+pid=${1:-invalid}
+timeout=$(echo ${2:-10})
+
+if [ $pid = "invalid" ]; then echo "Invalid pid"; exit 0; fi;
+
+function exists {
+	if test -d /proc/"$pid"/; then
+    	echo 1
+    else
+    	echo 0
+    fi
+}
+
+
+function wait_for_timeout {
+	s=0
+	while [ $s -lt $timeout ]; do
+		sleep 1
+		s=`expr $s + 1`
+		if [ `exists` == 0 ]; then
+			exit 0
+		fi
+	done
+	kill -9 $pid
+}
+
+if [ `exists` == 1 ]; then
+    kill $pid
+    wait_for_timeout
+fi

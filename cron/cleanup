@@ -1,0 +1,8 @@
+#! /bin/bash
+
+echo "clean up"
+
+jq -c '.cameras[]' $CONFIGURATION | while read i; do
+	  dir_name=$(echo $i | jq -r '.directory')
+      
+done

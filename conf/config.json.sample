@@ -1,0 +1,18 @@
+{
+	"properties": {
+		"segment_time": 500,
+		"keep_backup": "5"
+	},
+	"cameras": [
+  		{
+  			"alias": "Superior",
+  			"url": "rtsp://sample.host1:554",
+  			"directory": "superior"
+  		},
+  		{
+  			"alias": "Frente",
+			"url": "rtsp://sample.host2:554",
+  			"directory": "inferior"
+		}
+	]
+}
