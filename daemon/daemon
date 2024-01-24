@@ -5,13 +5,13 @@ SEGMENT_TIME=$(echo $CONFIGURATION | jq -c ".properties.segment_time")
 
 #read from json
 function start {
-    echo "$CONFIGURATION" | jq -c '.cameras[]' | while read i; do
-       $SCRIPT_DIR/camera_rec $i $SEGMENT_TIME &
+    echo "$CONFIGURATION" | jq -c '.streams[]' | while read i; do
+       $SCRIPT_DIR/stream_rec $i $SEGMENT_TIME &
     done
 }
 
 function stop {
-    killall camera_rec
+    killall stream_rec
 }
 
 running=1

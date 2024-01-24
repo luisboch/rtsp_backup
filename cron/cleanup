@@ -6,7 +6,6 @@ function isValidDate {
 
 KEEP_BACKUP=$( echo $CONFIGURATION | jq -r '.properties.keep_backup' )
 KEEP_BACKUP=${KEEP_BACKUP:-10}
-echo $KEEP_BACKUP
 
 find "$DATA_DIR" -type d | while read fullpath; do
 

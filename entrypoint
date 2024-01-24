@@ -1,11 +1,17 @@
 #! /bin/bash
 
+
+AUTO_CLEANUP_ENABLED=$( echo $CONFIGURATION | jq -r '.properties.auto_clean.enabled' )
+AUTO_CLEANUP_ENABLED="${AUTO_CLEANUP_ENABLED:-false}"
+KEEP_BACKUP=$( echo $CONFIGURATION | jq -r '.properties.auto_clean.keep_days' )
+KEEP_BACKUP=${KEEP_BACKUP:-10}
+
 if [ "$AUTO_CLEANUP_ENABLED" = "true" ]; then
-	KEEP_BACKUP=$( echo $CONFIGURATION | jq -r '.properties.keep_backup' )
-	KEEP_BACKUP=${KEEP_BACKUP:-10}
 	echo "We will remove directories older than $KEEP_BACKUP days"
 	echo "1	1	*	*	*	/bin/bash /app/cron/cleanup >> /var/log/cleanup.log " > /etc/crontabs/root
 	crond
+else
+	echo "Automatic clean is disabled"
 fi
 
 /app/daemon/daemon start

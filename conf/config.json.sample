@@ -1,18 +1,21 @@
 {
 	"properties": {
 		"segment_time": 500,
-		"keep_backup": "5"
+		"auto_clean": {
+			"enabled": true,
+			"keep_days": 10
+		}
 	},
-	"cameras": [
+	"streams": [
   		{
-  			"alias": "Superior",
+  			"alias": "Security camera 1",
   			"url": "rtsp://sample.host1:554",
-  			"directory": "superior"
+  			"directory": "sec1"
   		},
   		{
-  			"alias": "Frente",
+  			"alias": "Security camera 2",
 			"url": "rtsp://sample.host2:554",
-  			"directory": "inferior"
+  			"directory": "sec2"
 		}
 	]
 }
