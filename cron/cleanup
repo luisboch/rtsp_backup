@@ -1,10 +1,6 @@
 #! /bin/bash
 
-function isValidDate {
-    echo "1: $1, 2: $2"
-}
-
-KEEP_BACKUP=$( echo $CONFIGURATION | jq -r '.properties.auto_clean.keep_days' )
+KEEP_BACKUP="$( echo $CONFIGURATION | jq -r '.properties.auto_clean.keep_days' )"
 KEEP_BACKUP=${KEEP_BACKUP:-10}
 
 find "$DATA_DIR" -type d | while read fullpath; do
@@ -23,7 +19,7 @@ find "$DATA_DIR" -type d | while read fullpath; do
 
         if [ $diff -gt $KEEP_BACKUP ] ; then
             echo "Removing dir: $fullpath"
-            rm $fullpath
+            rm -rf $fullpath
         fi
     fi
 done
