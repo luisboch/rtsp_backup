@@ -2,6 +2,8 @@ package community.rtsp.config
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 @Serializable
 data class AppConfig(
@@ -24,8 +26,10 @@ data class AutoClean(
     val keepDays: Int
 )
 
+@OptIn(ExperimentalUuidApi::class)
 @Serializable
 data class StreamConfig(
+    val id: String = Uuid.random().toString(),
     val alias: String,
     val url: String,
     val directory: String

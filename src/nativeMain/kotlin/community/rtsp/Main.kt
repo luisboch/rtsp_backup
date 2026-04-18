@@ -14,9 +14,11 @@ import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.util.*
+import io.ktor.utils.io.*
 import io.ktor.utils.io.core.*
 import kotlinx.cinterop.*
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import platform.posix.*
@@ -56,6 +58,82 @@ fun Application.module() {
     }
 
     routing {
+
+        get("/api/stream/proxy/{uuid}") {
+            val uuid = call.parameters["uuid"]
+            val stream = config.streams.find { it.id == uuid }
+
+            if (stream == null) {
+                call.respond(HttpStatusCode.NotFound)
+                return@get
+            }
+
+            call.response.headers.append(
+                HttpHeaders.CacheControl,
+                "no-store, no-cache, must-revalidate, pre-check=0, post-check=0, max-age=0"
+            )
+            call.response.headers.append(HttpHeaders.Connection, "keep-alive")
+            call.response.headers.append(
+                HttpHeaders.ContentType,
+                "multipart/x-mixed-replace; boundary=ffmpeg"
+            )
+
+            // 2. RespondBytesWriter sem formatação extra (sem SSE)
+            call.respondBytesWriter {
+                var ffmpegProcess: CPointer<FILE>? = null
+                println("Starting Direct MJPEG stream for: $uuid")
+
+                try {
+                    val args = listOf(
+                        "ffmpeg",
+                        "-hide_banner", "-loglevel", "error",
+                        "-rtsp_transport", "tcp",
+                        "-i", stream.url,
+                        "-an",
+                        "-vcodec", "mjpeg",
+                        "-pix_fmt", "yuvj420p",
+                        "-f", "mpjpeg",
+                        "-q", "5",
+                        "-r", "5",
+                        "pipe:1"
+                    )
+
+                    val escapedCmd = args.joinToString(" ") { arg ->
+                        val cleanArg = if (arg.startsWith("rtsp://")) arg.trim().removeSuffix("?") else arg
+                        "'" + cleanArg.replace("'", "'\\''") + "'"
+                    }
+
+                    println("Executing command: $escapedCmd")
+
+                    ffmpegProcess = popen(escapedCmd, "r")
+                    if (ffmpegProcess == null) {
+                        println("Failed to start ffmpeg process for: $uuid")
+                        return@respondBytesWriter
+                    }
+
+                    val buffer = ByteArray(16384)
+                    while (true) {
+                        val read = memScoped {
+                            val nativeBuffer = allocArray<ByteVar>(buffer.size)
+                            val r = fread(nativeBuffer, 1u, buffer.size.toULong(), ffmpegProcess).toInt()
+                            if (r > 0) {
+                                for (i in 0 until r) buffer[i] = nativeBuffer[i]
+                            }
+                            r
+                        }
+
+                        if (read <= 0) break
+
+                        // 3. Escreve os bytes brutos do FFmpeg diretamente na resposta HTTP
+                        writeFully(buffer, 0, read)
+                        flush()
+                    }
+                } finally {
+                    ffmpegProcess?.let { pclose(it) }
+                    println("Closed Direct MJPEG stream for: $uuid")
+                }
+            }
+        }
         get("/health") {
             call.respondText("ok")
         }
@@ -79,67 +157,6 @@ fun Application.module() {
             call.respond(config.streams)
         }
 
-        get("/api/proxy/{alias}") {
-            val alias = call.parameters["alias"]
-            val stream = config.streams.find { it.alias == alias }
-            if (stream == null) {
-                call.respond(HttpStatusCode.NotFound)
-                return@get
-            }
-
-            call.response.headers.append("Cache-Control", "no-cache, no-store, must-revalidate")
-            call.response.headers.append("Pragma", "no-cache")
-            call.response.headers.append("Expires", "0")
-            call.response.headers.append("Connection", "close")
-
-            call.respondBytesWriter(contentType = ContentType.parse("multipart/x-mixed-replace; boundary=frame")) {
-
-                val args = listOf(
-                    "ffmpeg",
-                    "-hide_banner", "-loglevel", "error",
-                    "-rtsp_transport", "tcp",
-                    "-i", stream.url,
-                    "-f", "mpjpeg",
-                    "-q", "5",
-                    "-r", "5",
-                    "pipe:1"
-                )
-
-                // Escape each argument for shell
-                val escapedCmd = args.joinToString(" ") { arg ->
-                    val cleanArg = if (arg.startsWith("rtsp://")) arg.trim().removeSuffix("?") else arg
-                    "'" + cleanArg.replace("'", "'\\''") + "'"
-                }
-
-                println("Executing command:")
-                println(escapedCmd)
-
-                val fp = popen(escapedCmd, "r")
-                if (fp == null) return@respondBytesWriter
-
-                try {
-                    val buffer = ByteArray(16384)
-                    println("Reading stream")
-                    while (true) {
-                        val read = memScoped {
-                            val nativeBuffer = allocArray<ByteVar>(buffer.size)
-                            val r = fread(nativeBuffer, 1u, buffer.size.toULong(), fp).toInt()
-                            if (r > 0) {
-                                for (i in 0 until r) buffer[i] = nativeBuffer[i]
-                            }
-                            r
-                        }
-                        if (read <= 0) break
-                        writeFully(buffer, 0, read)
-                        flush()
-                    }
-                } finally {
-                    println("Read finished")
-                    pclose(fp)
-                }
-            }
-        }
-
         get("/api/files/{alias}") {
             val alias = call.parameters["alias"]
             val stream = config.streams.find { it.alias == alias }
@@ -150,7 +167,7 @@ fun Application.module() {
 
             val dataDir = getenv("DATA_DIR")?.toKString() ?: "/data"
             val dirPath = "$dataDir/${stream.directory}"
-            
+
             val files = mutableListOf<String>()
             val cmd = "find '$dirPath' -type f -name '*.mkv' | sort -r"
             val fp = popen(cmd, "r")
@@ -183,9 +200,12 @@ fun Application.module() {
 
             call.response.header(
                 HttpHeaders.ContentDisposition,
-                ContentDisposition.Attachment.withParameter(ContentDisposition.Parameters.FileName, path.substringAfterLast("/")).toString()
+                ContentDisposition.Attachment.withParameter(
+                    ContentDisposition.Parameters.FileName,
+                    path.substringAfterLast("/")
+                ).toString()
             )
-            
+
             val fd = fopen(file, "rb")
             if (fd == null) {
                 call.respond(HttpStatusCode.InternalServerError)
@@ -217,18 +237,11 @@ fun Application.module() {
         get("/api/stats/sse") {
             call.response.headers.append("Cache-Control", "no-cache")
             call.response.headers.append("Connection", "keep-alive")
-            call.respondBytesWriter(contentType = io.ktor.http.ContentType.Text.EventStream) {
+            call.respondBytesWriter(contentType = ContentType.Text.EventStream) {
                 while (true) {
                     val stats = systemStatsService.collect()
                     val payload = Json.encodeToString(stats)
-                    "event: stats\n".toByteArray().forEach {
-                        writeByte(it)
-                    }
-
-                    "data: $payload\n\n".toByteArray().forEach {
-                        writeByte(it)
-                    }
-
+                    writeStringUtf8("event: stats\ndata: $payload\n\n")
                     flush()
                     delay(call.request.queryParameters["interval"]?.toLongOrNull()?.milliseconds ?: 1.seconds)
                 }
