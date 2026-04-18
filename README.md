@@ -7,6 +7,33 @@ This repository is used to build Docker image available [Here](https://hub.docke
 # Running
 The recommended method is to use Docker image, the following guide is to run the standalone/manual mode.
 
+## Dashboard (React + TypeScript)
+
+A frontend dashboard is available in `frontend/` (pure React + TypeScript via Vite, no Next.js).
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+By default it proxies `/api/*` and `/health` to `http://localhost:8080`.
+
+## Kotlin server (Ktor + Coroutines, Native)
+
+The new server entrypoint is in `src/main/kotlin/community/rtsp/Main.kt` and exposes:
+- `GET /health`
+- `GET /api/status`
+- `GET /api/config`
+- `GET /api/stats/sse` (SSE realtime disk/memory/cpu)
+
+Build native binary (Linux host):
+
+```bash
+./gradlew linkReleaseExecutableNative
+./build/bin/native/releaseExecutable/rtsp_backup.kexe
+```
+
 ## Requirements
 This set of scripts needs some linux libraries to work:
  - bash: Script interpreter. Is included in most of popular Linux distributions;

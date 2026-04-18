@@ -1,1 +1,8 @@
 conf/config.json
+/.gradle/
+/build/
+/data/
+/.idea/
+/.kotlin/
+/frontend/node_modules/
+/frontend/dist/
