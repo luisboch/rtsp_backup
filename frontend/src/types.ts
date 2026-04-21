@@ -11,6 +11,8 @@ export type StatusPayload = {
     recording: boolean
     streamsConfigured: number
     ffmpegAvailable: boolean
+    diskUsedBytes: number
+    diskTotalBytes: number
     timestamp: number
 }
 

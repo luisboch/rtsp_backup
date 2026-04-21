@@ -64,7 +64,6 @@ export function App() {
                 <div className="streams-grid">
                     {streams.map(stream => (
                         <StreamCard
-                            key={stream.alias}
                             stream={stream}
                             onShowDirectory={(alias) => setSelectedDirectory(alias)}
                         />

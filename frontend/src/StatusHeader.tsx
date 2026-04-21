@@ -1,5 +1,5 @@
 import {useEffect, useMemo, useState} from "react";
-import {Activity, AlertCircle, CheckCircle2, Clock, Layers} from "lucide-react";
+import {Activity, AlertCircle, CheckCircle2, Clock, Cpu, HardDrive, Layers} from "lucide-react";
 import {StatusPayload, SystemStats} from "./types";
 
 export function StatusHeader({status, stats}: { status: StatusPayload | null, stats: SystemStats | null }) {
@@ -17,6 +17,24 @@ export function StatusHeader({status, stats}: { status: StatusPayload | null, st
     )
 
     const staleness = status ? (now - status.timestamp) / 1000 : Infinity
+
+    const formatBytes = (bytes: number) => {
+        if (bytes === 0) return '0 B'
+        const k = 1024
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+        const i = Math.floor(Math.log(bytes) / Math.log(k))
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+    }
+
+    const diskUsage = useMemo(
+        () => {
+            const used = status?.diskUsedBytes ?? stats?.diskUsedBytes ?? 0
+            const total = status?.diskTotalBytes ?? stats?.diskTotalBytes ?? 0
+            if (total === 0) return '0 / 0'
+            return `${formatBytes(used)} / ${formatBytes(total)}`
+        },
+        [status, stats]
+    )
 
     const clockColor = useMemo(
         () => {
@@ -46,6 +64,14 @@ export function StatusHeader({status, stats}: { status: StatusPayload | null, st
                         <AlertCircle size={18} color="#ef4444"/>
                     )}
                     <span>FFmpeg</span>
+                </div>
+                <div className="status-item">
+                    <HardDrive size={18} color="#8b5cf6"/>
+                    <span>Disk: {diskUsage}</span>
+                </div>
+                <div className="status-item">
+                    <Cpu size={18} color="#f59e0b"/>
+                    <span>CPU: {stats?.cpuLoadPercent ?? 0}%</span>
                 </div>
                 <div className="status-item">
                     <Clock size={18} color={clockColor}/>

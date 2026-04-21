@@ -16,7 +16,14 @@ data class Properties(
     @SerialName("segment_time")
     val segmentTime: Int,
     @SerialName("auto_clean")
-    val autoClean: AutoClean
+    val autoClean: AutoClean,
+    val auth: AuthConfig = AuthConfig()
+)
+
+@Serializable
+data class AuthConfig(
+    val user: String = "admin",
+    val pass: String = "admin"
 )
 
 @Serializable
