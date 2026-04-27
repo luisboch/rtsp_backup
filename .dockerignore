@@ -6,3 +6,5 @@ dist
 .git
 frontend/node_modules
 frontend/dist
+data
+conf
