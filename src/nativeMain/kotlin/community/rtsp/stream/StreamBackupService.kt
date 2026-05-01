@@ -8,7 +8,7 @@ import platform.posix.*
 import kotlinx.cinterop.*
 
 @OptIn(ExperimentalForeignApi::class)
-class StreamService(
+class StreamBackupService(
     private val config: AppConfig,
     private val authRepository: AuthRepository
 ) {
@@ -26,6 +26,11 @@ class StreamService(
         recorders[stream.alias] = scope.launch {
             runRecorder(stream)
         }
+    }
+
+    fun stopStreamRecording(alias: String) {
+        recorders[alias]?.cancel()
+        recorders.remove(alias)
     }
 
     private suspend fun CoroutineScope.runRecorder(stream: Stream) {

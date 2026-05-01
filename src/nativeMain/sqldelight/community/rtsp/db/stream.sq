@@ -4,20 +4,23 @@ CREATE TABLE stream (
     alias TEXT UNIQUE NOT NULL,
     rtsp_url TEXT NOT NULL,
     directory TEXT NOT NULL,
+    active INTEGER NOT NULL DEFAULT 1,
     FOREIGN KEY(owner_id) REFERENCES user(id)
 );
 
 insertStream:
-INSERT INTO stream (owner_id, alias, rtsp_url, directory)
-VALUES (?, ?, ?, ?);
+INSERT INTO stream (owner_id, alias, rtsp_url, directory, active)
+VALUES (?, ?, ?, ?, 1);
 
 getStreamById:
 SELECT * FROM stream
 WHERE id = ?;
 
 getStreamByAlias:
-SELECT * FROM stream
-WHERE alias = ?;
+SELECT s.* FROM stream s
+LEFT JOIN stream_share ss ON s.id = ss.stream_id
+WHERE alias = :alias AND (s.owner_id = :userId OR ss.user_id = :userId)
+;
 
 getStreamsByOwner:
 SELECT * FROM stream
@@ -27,10 +30,13 @@ deleteStream:
 DELETE FROM stream
 WHERE id = ?;
 
+inactivateStream:
+UPDATE stream SET active = 0 WHERE id = ?;
+
 getAllStreams:
-SELECT * FROM stream;
+SELECT * FROM stream WHERE active = 1;
 
 getStreamsForUser:
 SELECT s.* FROM stream s
 LEFT JOIN stream_share ss ON s.id = ss.stream_id
-WHERE s.owner_id = ? OR ss.user_id = ?;
+WHERE (s.owner_id = ? OR ss.user_id = ?) AND s.active = 1;

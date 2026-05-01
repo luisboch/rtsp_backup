@@ -1,1 +1,1 @@
-{"root":["./src/App.tsx","./src/main.tsx"],"version":"5.9.3"}
+{"root":["./src/AddStreamModal.tsx","./src/App.tsx","./src/DirectoryView.tsx","./src/Login.tsx","./src/StatusHeader.tsx","./src/StreamCard.tsx","./src/main.tsx","./src/types.ts"],"version":"5.9.3"}

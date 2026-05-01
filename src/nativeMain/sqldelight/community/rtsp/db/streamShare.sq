@@ -14,6 +14,10 @@ unshareStream:
 DELETE FROM stream_share
 WHERE stream_id = ? AND user_id = ?;
 
+deleteAllShares:
+DELETE FROM stream_share
+WHERE stream_id = ?;
+
 getSharedStreamIds:
 SELECT stream_id FROM stream_share
 WHERE user_id = ?;

@@ -2,18 +2,20 @@ package community.rtsp
 
 import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.driver.native.NativeSqliteDriver
+import app.cash.sqldelight.driver.native.wrapConnection
+import co.touchlab.sqliter.DatabaseConfiguration
 import community.rtsp.auth.AuthRepository
+import community.rtsp.auth.SessionCleanupService
 import community.rtsp.auth.SessionService
 import community.rtsp.auth.UserSession
 import community.rtsp.auth.authRoutes
 import community.rtsp.config.ConfigLoader
 import community.rtsp.db.Database
-import community.rtsp.dto.StreamDto.Companion.toDto
 import community.rtsp.routes.live
-import community.rtsp.routes.streamProxy
+import community.rtsp.routes.streamRoutes
 import community.rtsp.routes.video
 import community.rtsp.stream.CleanService
-import community.rtsp.stream.StreamService
+import community.rtsp.stream.StreamBackupService
 import community.rtsp.system.AppStatus
 import community.rtsp.system.FfmpegCliService
 import community.rtsp.system.SystemStatsService
@@ -26,7 +28,6 @@ import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.cors.routing.*
-import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sessions.*
@@ -60,8 +61,21 @@ fun main() {
 fun Application.module() {
     val config = ConfigLoader.load()
 
-    // Database & Auth Initialization
-    val driver: SqlDriver = NativeSqliteDriver(Database.Schema, "test.db")
+    val driver: SqlDriver = NativeSqliteDriver(
+        configuration = DatabaseConfiguration(
+            name = "database.db",
+            version = Database.Schema.version.toInt(),
+            create = { connection ->
+                wrapConnection(connection) { Database.Schema.create(it) }
+            },
+            upgrade = { connection, oldVersion, newVersion ->
+                wrapConnection(connection) { Database.Schema.migrate(it, oldVersion.toLong(), newVersion.toLong()) }
+            },
+            extendedConfig = DatabaseConfiguration.Extended(
+                basePath = config.dataDir
+            )
+        )
+    )
     val database = Database(driver)
 
     val authRepository = AuthRepository(
@@ -70,19 +84,22 @@ fun Application.module() {
     )
 
     val sessionService = SessionService(database.sessionQueries)
+    val sessionCleanupService = SessionCleanupService(sessionService)
     val randomService = GenerateRandomService()
 
     val systemStatsService = SystemStatsService()
     val ffmpegCliService = FfmpegCliService()
-    val backupService = StreamService(config, authRepository)
+    val backupService = StreamBackupService(config, authRepository)
     val cleanService = CleanService(config, authRepository)
 
     backupService.start()
     cleanService.start()
+    sessionCleanupService.start()
 
     environment.monitor.subscribe(ApplicationStopping) {
         backupService.stop()
         cleanService.stop()
+        sessionCleanupService.stop()
     }
 
     install(CORS) {
@@ -125,7 +142,7 @@ fun Application.module() {
 
         // Protected routes
         authenticate("auth-session") {
-            streamProxy(authRepository)
+            streamRoutes(authRepository, randomService, backupService)
 
             get("/api/config") {
                 call.respond(config)
@@ -145,58 +162,6 @@ fun Application.module() {
                 )
             }
 
-            get("/api/streams") {
-                val session = call.principal<UserSession>()
-                val userId = session?.userId
-                if (userId != null) {
-                    val streams = authRepository.getStreamsForUser(userId)
-                        .executeAsList().map { stream -> stream.toDto() }
-                    call.respond(streams)
-                } else {
-                    call.respond(HttpStatusCode.Unauthorized)
-                }
-            }
-
-            post("/api/streams") {
-                val session = call.principal<UserSession>()
-                val userId = session?.userId
-                if (userId == null) {
-                    call.respond(HttpStatusCode.Unauthorized)
-                    return@post
-                }
-
-                val request = try {
-                    call.receive<AddStreamRequest>()
-                } catch (e: Exception) {
-                    call.respond(HttpStatusCode.BadRequest, mapOf("message" to "Invalid request body"))
-                    return@post
-                }
-
-                if (request.alias.isBlank() || request.rtspUrl.isBlank()) {
-                    call.respond(HttpStatusCode.BadRequest, mapOf("message" to "All fields are required"))
-                    return@post
-                }
-
-                try {
-                    val directory = randomService.generate(16)
-                    authRepository.addStream(
-                        ownerId = userId,
-                        alias = request.alias,
-                        url = request.rtspUrl,
-                        dir = directory
-                    )
-                    
-                    val newStream = authRepository.getStreamByAlias(request.alias)
-                    if (newStream != null) {
-                        backupService.startStreamRecording(newStream)
-                        call.respond(HttpStatusCode.Created, newStream.toDto())
-                    } else {
-                        call.respond(HttpStatusCode.InternalServerError, mapOf("message" to "Failed to retrieve created stream"))
-                    }
-                } catch (e: Exception) {
-                    call.respond(HttpStatusCode.Conflict, mapOf("message" to "Stream alias already exists or database error"))
-                }
-            }
 
             get("/api/files/{alias}") {
                 val session = call.principal<UserSession>()
@@ -208,17 +173,10 @@ fun Application.module() {
                     return@get
                 }
 
-                val stream = authRepository.getStreamByAlias(alias)
+                val stream = authRepository.getStreamByAlias(alias, userId)
 
                 if (stream == null) {
                     call.respond(HttpStatusCode.NoContent)
-                    return@get
-                }
-
-                // Check if user has access (owner or shared)
-                if (stream.owner_id != userId) {
-                    // This is a simplified check.
-                    call.respond(HttpStatusCode.Forbidden)
                     return@get
                 }
 
@@ -231,7 +189,7 @@ fun Application.module() {
                     memScoped {
                         val line = allocArray<ByteVar>(1024)
                         while (fgets(line, 1024, fp) != null) {
-                            files.add(line.toKString().trim().removePrefix(config.dataDir).removePrefix("/"))
+                            files.add(line.toKString().trim().removePrefix(config.dataDir).removePrefix("/${stream.owner_id}/"))
                         }
                     }
                     pclose(fp)

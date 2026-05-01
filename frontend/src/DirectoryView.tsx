@@ -39,7 +39,10 @@ export function DirectoryView({alias, onClose}: { alias: string, onClose: () => 
                         <li key={file} className="file-item">
                             <span>{file.split('/').pop()}</span>
                             <a href={`/api/video/${file}`} target="_blank" rel="noreferrer">
-                                Open in new page
+                                Open
+                            </a>
+                            <a href={`/api/video/${file}?download=true`} target="_blank" rel="noreferrer">
+                                Download
                             </a>
                         </li>
                     ))}

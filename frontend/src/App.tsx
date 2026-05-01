@@ -48,6 +48,25 @@ export function App() {
         setStreams(prev => [...prev, addedStream]);
     };
 
+    const handleDeleteStream = async (stream: StreamInfo) => {
+        if (!window.confirm('Are you sure you want to remove this stream?')) return;
+
+        try {
+            const response = await fetch(`/api/streams/${stream.id}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || 'Failed to delete stream');
+            }
+
+            setStreams(prev => prev.filter(s => s.id !== stream.id));
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
+
     useEffect(() => {
         fetch('/api/status')
             .then(res => {
@@ -153,6 +172,7 @@ export function App() {
                                 key={stream.id}
                                 stream={stream}
                                 onShowDirectory={(alias) => setSelectedDirectory(alias)}
+                                onDelete={handleDeleteStream}
                             />
                         ))}
                     </div>

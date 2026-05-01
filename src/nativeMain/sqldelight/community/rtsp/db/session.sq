@@ -20,4 +20,4 @@ WHERE token = ?;
 
 deleteExpiredSessions:
 DELETE FROM session
-WHERE expires_at << ?;
+WHERE expires_at < ?;

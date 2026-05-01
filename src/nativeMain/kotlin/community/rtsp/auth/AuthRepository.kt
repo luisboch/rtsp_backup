@@ -54,12 +54,28 @@ class AuthRepository(
         streamShareQueries.shareStream(streamId, targetUserId)
     }
 
-    fun getStreamByAlias(alias: String): Stream? {
-        return streamQueries.getStreamByAlias(alias).executeAsOneOrNull()
+    fun getStreamByAlias(alias: String, userId: Long): Stream? {
+        return streamQueries.getStreamByAlias(alias, userId).executeAsOneOrNull()
+    }
+
+    fun unshareStream(streamId: Long, userId: Long) {
+        streamShareQueries.unshareStream(streamId, userId)
+    }
+
+    fun deleteAllShares(streamId: Long) {
+        streamShareQueries.deleteAllShares(streamId)
     }
 
     fun deleteStream(streamId: Long, ownerId: Long) {
         // In a real app, check ownership first
         streamQueries.deleteStream(streamId)
+    }
+
+    fun inactivateStream(streamId: Long) {
+        streamQueries.inactivateStream(streamId)
+    }
+
+    fun getStreamById(id: Long): Stream? {
+        return streamQueries.getStreamById(id).executeAsOneOrNull()
     }
 }

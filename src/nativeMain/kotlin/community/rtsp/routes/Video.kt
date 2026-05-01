@@ -37,13 +37,15 @@ fun Route.video(config: AppConfig) {
             return@get
         }
 
-        call.response.header(
-            HttpHeaders.ContentDisposition,
-            ContentDisposition.Attachment.withParameter(
-                ContentDisposition.Parameters.FileName,
-                path.substringAfterLast("/")
-            ).toString()
-        )
+        if (call.request.queryParameters["download"] == "true") {
+            call.response.header(
+                HttpHeaders.ContentDisposition,
+                ContentDisposition.Attachment.withParameter(
+                    ContentDisposition.Parameters.FileName,
+                    path.substringAfterLast("/")
+                ).toString()
+            )
+        }
 
         val fd = fopen(file, "rb")
         if (fd == null) {
