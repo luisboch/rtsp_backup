@@ -105,6 +105,8 @@ fun Application.module() {
     install(CORS) {
         anyHost()
         allowHeader("Content-Type")
+        allowMethod(HttpMethod.Delete)
+        allowMethod(HttpMethod.Put)
     }
 
     install(ContentNegotiation) {
@@ -189,7 +191,10 @@ fun Application.module() {
                     memScoped {
                         val line = allocArray<ByteVar>(1024)
                         while (fgets(line, 1024, fp) != null) {
-                            files.add(line.toKString().trim().removePrefix(config.dataDir).removePrefix("/${stream.owner_id}/"))
+                            files.add(
+                                line.toKString().trim().removePrefix(config.dataDir)
+                                    .removePrefix("/${stream.owner_id}/")
+                            )
                         }
                     }
                     pclose(fp)

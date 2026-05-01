@@ -157,6 +157,8 @@ fun Route.streamRoutes(
         }
 
         val streamId = call.parameters["id"]?.toLongOrNull()
+
+        println("DELETE /api/streams/${streamId ?: "null"}")
         if (streamId == null) {
             call.respond(HttpStatusCode.BadRequest, mapOf("message" to "Invalid stream ID"))
             return@delete
@@ -164,7 +166,7 @@ fun Route.streamRoutes(
 
         val stream = authRepository.getStreamById(streamId)
         if (stream == null) {
-            call.respond(HttpStatusCode.NotFound, mapOf("message" to "Stream not found"))
+            call.respond(HttpStatusCode.NoContent, mapOf("message" to "Stream not found"))
             return@delete
         }
 
