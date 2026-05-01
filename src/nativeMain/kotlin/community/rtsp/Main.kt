@@ -1,35 +1,50 @@
 package community.rtsp
 
-import community.rtsp.config.AppConfig
-import io.ktor.server.application.*
-import io.ktor.server.http.content.*
-import io.ktor.server.routing.*
-import io.ktor.server.response.*
-import io.ktor.server.request.*
-import io.ktor.server.plugins.contentnegotiation.*
-import io.ktor.server.auth.*
-import io.ktor.server.plugins.cors.routing.*
-import io.ktor.http.*
-import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.encodeToString
-import community.rtsp.stream.StreamService
-import community.rtsp.stream.CleanService
+import app.cash.sqldelight.db.SqlDriver
+import app.cash.sqldelight.driver.native.NativeSqliteDriver
+import community.rtsp.auth.AuthRepository
+import community.rtsp.auth.SessionService
+import community.rtsp.auth.UserSession
+import community.rtsp.auth.authRoutes
 import community.rtsp.config.ConfigLoader
+import community.rtsp.db.Database
+import community.rtsp.dto.StreamDto.Companion.toDto
 import community.rtsp.routes.live
 import community.rtsp.routes.streamProxy
 import community.rtsp.routes.video
+import community.rtsp.stream.CleanService
+import community.rtsp.stream.StreamService
 import community.rtsp.system.AppStatus
 import community.rtsp.system.FfmpegCliService
 import community.rtsp.system.SystemStatsService
+import community.rtsp.util.GenerateRandomService
+import io.ktor.http.*
+import io.ktor.serialization.kotlinx.json.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.cio.*
+import io.ktor.server.engine.*
+import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.cors.routing.*
+import io.ktor.server.request.*
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
+import io.ktor.server.sessions.*
+import io.ktor.utils.io.*
 import kotlinx.cinterop.*
 import kotlinx.coroutines.*
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import platform.posix.*
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import io.ktor.utils.io.*
-import io.ktor.server.cio.*
-import io.ktor.server.engine.*
+
+@Serializable
+data class AddStreamRequest(
+    val alias: String,
+    val rtspUrl: String
+)
 
 @OptIn(ExperimentalForeignApi::class)
 fun main() {
@@ -44,10 +59,23 @@ fun main() {
 @OptIn(ExperimentalForeignApi::class)
 fun Application.module() {
     val config = ConfigLoader.load()
+
+    // Database & Auth Initialization
+    val driver: SqlDriver = NativeSqliteDriver(Database.Schema, "test.db")
+    val database = Database(driver)
+
+    val authRepository = AuthRepository(
+        database,
+        community.rtsp.auth.PasswordHasher()
+    )
+
+    val sessionService = SessionService(database.sessionQueries)
+    val randomService = GenerateRandomService()
+
     val systemStatsService = SystemStatsService()
     val ffmpegCliService = FfmpegCliService()
-    val backupService = StreamService(config)
-    val cleanService = CleanService(config)
+    val backupService = StreamService(config, authRepository)
+    val cleanService = CleanService(config, authRepository)
 
     backupService.start()
     cleanService.start()
@@ -66,12 +94,20 @@ fun Application.module() {
         json(Json { prettyPrint = true })
     }
 
+    install(Sessions) {
+        cookie<UserSession>("session_id") {
+            cookie.path = "/"
+            cookie.httpOnly = true
+            cookie.secure = false // Set to false for development (no HTTPS)
+            cookie.extensions["SameSite"] = "Lax"
+        }
+    }
+
     install(Authentication) {
-        basic("auth-basic") {
-            realm = "Access to the RTSP Backup"
-            validate { credentials ->
-                if (credentials.name == config.properties.auth.user && credentials.password == config.properties.auth.pass) {
-                    UserIdPrincipal(credentials.name)
+        session<UserSession>("auth-session") {
+            validate { session ->
+                if (sessionService.getUserIdByToken(session.token) != null) {
+                    session
                 } else {
                     null
                 }
@@ -80,11 +116,16 @@ fun Application.module() {
     }
 
     routing {
-        authenticate("auth-basic") {
-            streamProxy(config)
-            get("/health") {
-                call.respondText("ok")
-            }
+        // Public routes
+        get("/health") {
+            call.respondText("ok")
+        }
+
+        authRoutes(authRepository, sessionService, randomService)
+
+        // Protected routes
+        authenticate("auth-session") {
+            streamProxy(authRepository)
 
             get("/api/config") {
                 call.respond(config)
@@ -95,29 +136,93 @@ fun Application.module() {
                 call.respond(
                     AppStatus(
                         recording = backupService.isRecording(),
-                        streamsConfigured = config.streams.size,
+                        streamsConfigured = authRepository.getAllStreams().size,
                         ffmpegAvailable = ffmpegCliService.isAvailable(),
                         diskUsedBytes = stats.diskUsedBytes,
                         diskTotalBytes = stats.diskTotalBytes,
-                        timestamp = time(null).toLong() * 1000
+                        timestamp = time(null) * 1000
                     )
                 )
             }
 
             get("/api/streams") {
-                call.respond(config.streams)
+                val session = call.principal<UserSession>()
+                val userId = session?.userId
+                if (userId != null) {
+                    val streams = authRepository.getStreamsForUser(userId)
+                        .executeAsList().map { stream -> stream.toDto() }
+                    call.respond(streams)
+                } else {
+                    call.respond(HttpStatusCode.Unauthorized)
+                }
+            }
+
+            post("/api/streams") {
+                val session = call.principal<UserSession>()
+                val userId = session?.userId
+                if (userId == null) {
+                    call.respond(HttpStatusCode.Unauthorized)
+                    return@post
+                }
+
+                val request = try {
+                    call.receive<AddStreamRequest>()
+                } catch (e: Exception) {
+                    call.respond(HttpStatusCode.BadRequest, mapOf("message" to "Invalid request body"))
+                    return@post
+                }
+
+                if (request.alias.isBlank() || request.rtspUrl.isBlank()) {
+                    call.respond(HttpStatusCode.BadRequest, mapOf("message" to "All fields are required"))
+                    return@post
+                }
+
+                try {
+                    val directory = randomService.generate(16)
+                    authRepository.addStream(
+                        ownerId = userId,
+                        alias = request.alias,
+                        url = request.rtspUrl,
+                        dir = directory
+                    )
+                    
+                    val newStream = authRepository.getStreamByAlias(request.alias)
+                    if (newStream != null) {
+                        backupService.startStreamRecording(newStream)
+                        call.respond(HttpStatusCode.Created, newStream.toDto())
+                    } else {
+                        call.respond(HttpStatusCode.InternalServerError, mapOf("message" to "Failed to retrieve created stream"))
+                    }
+                } catch (e: Exception) {
+                    call.respond(HttpStatusCode.Conflict, mapOf("message" to "Stream alias already exists or database error"))
+                }
             }
 
             get("/api/files/{alias}") {
+                val session = call.principal<UserSession>()
+                val userId = session?.userId
                 val alias = call.parameters["alias"]
-                val stream = config.streams.find { it.alias == alias }
-                if (stream == null) {
-                    call.respond(HttpStatusCode.NotFound)
+
+                if (userId == null || alias == null) {
+                    call.respond(HttpStatusCode.Unauthorized)
                     return@get
                 }
 
-                val dataDir = getenv("DATA_DIR")?.toKString() ?: "/data"
-                val dirPath = "$dataDir/${stream.directory}"
+                val stream = authRepository.getStreamByAlias(alias)
+
+                if (stream == null) {
+                    call.respond(HttpStatusCode.NoContent)
+                    return@get
+                }
+
+                // Check if user has access (owner or shared)
+                if (stream.owner_id != userId) {
+                    // This is a simplified check.
+                    call.respond(HttpStatusCode.Forbidden)
+                    return@get
+                }
+
+                val dirPath = "${config.dataDir}/${stream.owner_id}/${stream.directory}"
 
                 val files = mutableListOf<String>()
                 val cmd = "find '$dirPath/backup' -type f -name '*.mp4' | sort -r"
@@ -126,7 +231,7 @@ fun Application.module() {
                     memScoped {
                         val line = allocArray<ByteVar>(1024)
                         while (fgets(line, 1024, fp) != null) {
-                            files.add(line.toKString().trim().removePrefix(dataDir).removePrefix("/"))
+                            files.add(line.toKString().trim().removePrefix(config.dataDir).removePrefix("/"))
                         }
                     }
                     pclose(fp)
@@ -149,8 +254,7 @@ fun Application.module() {
             }
 
             live(config)
-            streamProxy(config)
-            video()
+            video(config)
         }
     }
 }

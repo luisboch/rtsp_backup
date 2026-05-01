@@ -6,16 +6,8 @@
 			"keep_days": 10
 		}
 	},
-	"streams": [
-  		{
-  			"alias": "Security camera 1",
-  			"url": "rtsp://sample.host1:554",
-  			"directory": "sec1"
-  		},
-  		{
-  			"alias": "Security camera 2",
-			"url": "rtsp://sample.host2:554",
-  			"directory": "sec2"
-		}
-	]
+	"auth": {
+	    "user": "luis",
+	    "password": "123456789$@#$1"
+	}
 }

@@ -123,3 +123,56 @@ button:hover {
 .file-item a:hover {
   text-decoration: underline;
 }
+
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.login-form {
+  background: #161c33;
+  padding: 2.5rem;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-size: 0.9rem;
+  color: #94a3b8;
+}
+
+.form-group input {
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #1e293b;
+  background: #0b1020;
+  color: white;
+  font-size: 1rem;
+}
+
+.form-group input:focus {
+  outline: 2px solid #2563eb;
+  border-color: transparent;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  color: #94a3b8;
+  font-size: 1.2rem;
+}

@@ -18,7 +18,18 @@ export type StatusPayload = {
 
 export type StreamInfo = {
     id: string
+    ownerId: number
     alias: string
-    url: string
+    rtspUrl: string
     directory: string
+}
+
+export type NewStream = {
+    alias: string
+    rtspUrl: string
+}
+
+export type UserSession = {
+    userId: number
+    token: string
 }

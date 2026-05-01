@@ -1,0 +1,36 @@
+CREATE TABLE stream (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_id INTEGER NOT NULL,
+    alias TEXT UNIQUE NOT NULL,
+    rtsp_url TEXT NOT NULL,
+    directory TEXT NOT NULL,
+    FOREIGN KEY(owner_id) REFERENCES user(id)
+);
+
+insertStream:
+INSERT INTO stream (owner_id, alias, rtsp_url, directory)
+VALUES (?, ?, ?, ?);
+
+getStreamById:
+SELECT * FROM stream
+WHERE id = ?;
+
+getStreamByAlias:
+SELECT * FROM stream
+WHERE alias = ?;
+
+getStreamsByOwner:
+SELECT * FROM stream
+WHERE owner_id = ?;
+
+deleteStream:
+DELETE FROM stream
+WHERE id = ?;
+
+getAllStreams:
+SELECT * FROM stream;
+
+getStreamsForUser:
+SELECT s.* FROM stream s
+LEFT JOIN stream_share ss ON s.id = ss.stream_id
+WHERE s.owner_id = ? OR ss.user_id = ?;

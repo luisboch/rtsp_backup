@@ -1,8 +1,12 @@
 import {useEffect, useMemo, useState} from "react";
-import {Activity, AlertCircle, CheckCircle2, Clock, Cpu, HardDrive, Layers} from "lucide-react";
+import {Activity, AlertCircle, CheckCircle2, Clock, Cpu, HardDrive, Layers, LogOut} from "lucide-react";
 import {StatusPayload, SystemStats} from "./types";
 
-export function StatusHeader({status, stats}: { status: StatusPayload | null, stats: SystemStats | null }) {
+export function StatusHeader({status, stats, onLogout}: {
+    status: StatusPayload | null,
+    stats: SystemStats | null,
+    onLogout?: () => void
+}) {
     const [now, setNow] = useState(Date.now())
 
     useEffect(
@@ -77,6 +81,21 @@ export function StatusHeader({status, stats}: { status: StatusPayload | null, st
                     <Clock size={18} color={clockColor}/>
                     <span>{status ? new Date(status.timestamp).toLocaleTimeString() : '--:--:--'}</span>
                 </div>
+                {onLogout && (
+                    <button
+                        onClick={onLogout}
+                        style={{
+                            background: 'transparent',
+                            color: '#ef4444',
+                            padding: '0.25rem',
+                            display: 'flex',
+                            alignItems: 'center'
+                        }}
+                        title="Logout"
+                    >
+                        <LogOut size={18}/>
+                    </button>
+                )}
             </div>
         </header>
     )

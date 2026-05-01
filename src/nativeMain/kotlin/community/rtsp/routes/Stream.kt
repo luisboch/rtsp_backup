@@ -1,6 +1,6 @@
 package community.rtsp.routes
 
-import community.rtsp.config.AppConfig
+import community.rtsp.auth.AuthRepository
 import community.rtsp.routes.util.bufferedRead
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -14,10 +14,10 @@ import platform.posix.popen
 
 
 @OptIn(ExperimentalForeignApi::class)
-fun Route.streamProxy(config: AppConfig) {
+fun Route.streamProxy(authRepository: AuthRepository) {
     get("/api/stream/proxy/{uuid}") {
         val uuid = call.parameters["uuid"]
-        val stream = config.streams.find { it.id == uuid }
+        val stream = authRepository.getAllStreams().find { it.alias == uuid }
 
         if (stream == null) {
             call.respond(HttpStatusCode.NotFound)
@@ -44,7 +44,7 @@ fun Route.streamProxy(config: AppConfig) {
                     "ffmpeg",
                     "-hide_banner", "-loglevel", "error",
                     "-rtsp_transport", "tcp",
-                    "-i", stream.url,
+                    "-i", stream.rtsp_url,
                     "-an",
                     "-vcodec", "mjpeg",
                     "-pix_fmt", "yuvj420p",

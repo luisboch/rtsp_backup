@@ -1,26 +1,34 @@
 package community.rtsp.stream
 
+import community.rtsp.auth.AuthRepository
 import community.rtsp.config.AppConfig
-import community.rtsp.config.StreamConfig
+import community.rtsp.db.Stream
 import kotlinx.coroutines.*
 import platform.posix.*
 import kotlinx.cinterop.*
 
 @OptIn(ExperimentalForeignApi::class)
-class StreamService(private val config: AppConfig) {
+class StreamService(
+    private val config: AppConfig,
+    private val authRepository: AuthRepository
+) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private val dataDir = getenv("DATA_DIR")?.toKString() ?: "/data"
     private val recorders = mutableMapOf<String, Job>()
 
     fun start() {
-        config.streams.forEach { streamConfig ->
-            recorders[streamConfig.alias] = scope.launch {
-                runRecorder(streamConfig)
-            }
+        authRepository.getAllStreams().forEach { stream ->
+            startStreamRecording(stream)
         }
     }
 
-    private suspend fun CoroutineScope.runRecorder(stream: StreamConfig) {
+    fun startStreamRecording(stream: Stream) {
+        if (recorders.containsKey(stream.alias)) return
+        recorders[stream.alias] = scope.launch {
+            runRecorder(stream)
+        }
+    }
+
+    private suspend fun CoroutineScope.runRecorder(stream: Stream) {
         while (isActive) {
             val pid = startFfmpeg(stream)
             if (pid > 0) {
@@ -46,15 +54,15 @@ class StreamService(private val config: AppConfig) {
         }
     }
 
-    private fun startFfmpeg(stream: StreamConfig): Int {
-        val cameraDir = "$dataDir/${stream.directory}"
+    private fun startFfmpeg(stream: Stream): Int {
+        val cameraDir = "${config.dataDir}/${stream.owner_id}/${stream.directory}"
         val liveDir = "$cameraDir/live"
         val backupDir = "$cameraDir/backup"
         
         system("mkdir -p $liveDir")
         system("mkdir -p $backupDir")
         
-        val rtspUrl = stream.url.trim().removeSuffix("?")
+        val rtspUrl = stream.rtsp_url.trim().removeSuffix("?")
         val segmentTime = config.properties.segmentTime.toString()
         
         val args = listOf(

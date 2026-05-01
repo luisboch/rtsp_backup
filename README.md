@@ -1,5 +1,14 @@
-# Introduction
-Make backups from your rtsp live streams (like wifi security cameras).
+# RTSP Backup
+
+Make backups from your RTSP live streams (like WiFi security cameras) and view them via a web dashboard.
+
+## Overview
+
+RTSP Backup is a full-stack application that:
+- Records RTSP streams into segmented video files using `ffmpeg`.
+- Provides a web dashboard (React) to monitor system health and view recordings.
+- Manages disk space with an automatic cleanup service.
+- Features a Ktor-based backend compiled to a native binary.
 
 # How it works
 This repository is used to build Docker image available [Here](https://hub.docker.com/r/luisboch/rtsp-backup)
@@ -21,57 +30,63 @@ By default it proxies `/api/*` and `/health` to `http://localhost:8080`.
 
 ## Kotlin server (Ktor + Coroutines, Native)
 
-The new server entrypoint is in `src/main/kotlin/community/rtsp/Main.kt` and exposes:
-- `GET /health`
-- `GET /api/status`
-- `GET /api/config`
-- `GET /api/stats/sse` (SSE realtime disk/memory/cpu)
+The server entrypoint is in `src/nativeMain/kotlin/community/rtsp/Main.kt` and exposes:
+- `GET /health` - System health check
+- `POST /api/auth/login` - User authentication
+- `GET /api/status` - Current recording status
+- `GET /api/config` - Application configuration
+- `GET /api/stats/sse` - SSE real-time system stats (Disk/Memory/CPU)
 
-Build native binary (Linux host):
+Build and run native binary:
 
 ```bash
+./gradlew runDebugExecutableNative
+```
+
+Build release binary:
+```bash
 ./gradlew linkReleaseExecutableNative
-./build/bin/native/releaseExecutable/rtsp_backup.kexe
+# Binary will be at build/bin/native/releaseExecutable/rtsp_backup.kexe
 ```
 
 ## Requirements
-This set of scripts needs some linux libraries to work:
- - bash: Script interpreter. Is included in most of popular Linux distributions;
+This application needs some linux libraries and tools to work:
  - ffmpeg: tool-set used to read, encode and decode audio and video streams;
- - jq: manipulates json easily;
+ - libcurl: used by Ktor for networking;
+ - sqlite3: for database support (if applicable).
 ## Start 
 ### Configuration file
 
-The config sample is [here](./conf/config.json.sample)
+The config sample is [here](./conf/config.json.sample). Copy it to `conf/config.json` and adjust as needed.
 
 Where
 - `properties`
   - `segment_time` seconds, is the time of splits between stream segments;
   - `auto_clean`
-    - `enabled` Auto clean old backup history? (enable auto cleanup... see [Here](./cron/cleanup));
+    - `enabled` Auto clean old backup history?
     - `keep_days` days to keep history;
 - `streams` List of streams to backup, with the following properties:
   - `alias` Name to help identification;
   - `url` Rtsp url with full configuration to read from (like host, port,  user and password);
   - `directory` Used to identify inside DATA_DIR, the backups from this stream
 
-### Backup
-Want to start backup? Just start daemon script, passing to it, the built configuration, like this:
+### Running the application
+
+The application is now a unified Kotlin Native binary that manages both recording and the web API.
 
 ```bash
-CONFIGURATION=$(jq -c . conf/config.json) ./daemon/daemon start &
-```
-Stop?
-```bash
-./daemon/daemon stop
+./gradlew runDebugExecutableNative
 ```
 
-## Cleaning up
-Want to dele older backups? Just configure the cron job to execute daily
-```bash
-CONFIGURATION=$(jq -c . conf/config.json) /cron/cleanup
-```
+The server will load configuration from `conf/config.json` by default.
+
+## Legacy Scripts (Optional)
+The following scripts were part of the original implementation and are still available for reference:
+- `daemon/daemon`: Original bash daemon for managing ffmpeg.
+- `cron/cleanup`: Original cleanup script.
 # Environments
 
-- CONFIGURATION: json with configuration
-- DATA_DIR: directory where store files
+The following environment variables can be used to configure the application:
+- `CONFIGURATION`: JSON string with configuration (overrides `conf/config.json`)
+- `DATA_DIR`: directory where video files are stored (default: `./data`)
+- `HTTP_PORT`: port for the web server (default: `8080`)

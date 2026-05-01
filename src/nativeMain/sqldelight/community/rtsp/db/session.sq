@@ -1,0 +1,23 @@
+CREATE TABLE session (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    token TEXT UNIQUE NOT NULL,
+    user_id INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    FOREIGN KEY(user_id) REFERENCES user(id)
+);
+
+insertSession:
+INSERT INTO session (token, user_id, expires_at)
+VALUES (?, ?, ?);
+
+getSessionByToken:
+SELECT * FROM session
+WHERE token = ?;
+
+deleteSessionByToken:
+DELETE FROM session
+WHERE token = ?;
+
+deleteExpiredSessions:
+DELETE FROM session
+WHERE expires_at << ?;

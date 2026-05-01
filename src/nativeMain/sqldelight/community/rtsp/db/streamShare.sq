@@ -1,0 +1,19 @@
+CREATE TABLE stream_share (
+    stream_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    PRIMARY KEY(stream_id, user_id),
+    FOREIGN KEY(stream_id) REFERENCES stream(id),
+    FOREIGN KEY(user_id) REFERENCES user(id)
+);
+
+shareStream:
+INSERT INTO stream_share (stream_id, user_id)
+VALUES (?, ?);
+
+unshareStream:
+DELETE FROM stream_share
+WHERE stream_id = ? AND user_id = ?;
+
+getSharedStreamIds:
+SELECT stream_id FROM stream_share
+WHERE user_id = ?;

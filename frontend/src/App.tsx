@@ -1,24 +1,84 @@
-import {useEffect, useState} from 'react'
+import {useEffect, useState, useCallback} from 'react'
 import {StreamCard} from "./StreamCard";
 import {DirectoryView} from "./DirectoryView";
 import {StatusHeader} from "./StatusHeader";
-import {StatusPayload, SystemStats, StreamInfo} from "./types";
+import {Login} from "./Login";
+import {StatusPayload, SystemStats, StreamInfo, NewStream} from "./types";
+import {AddStreamModal} from "./AddStreamModal";
+import {Plus} from "lucide-react";
 
 
 export function App() {
+    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
+    const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true)
     const [stats, setStats] = useState<SystemStats | null>(null)
     const [status, setStatus] = useState<StatusPayload | null>(null)
     const [streams, setStreams] = useState<StreamInfo[]>([])
     const [error, setError] = useState<string | null>(null)
     const [selectedDirectory, setSelectedDirectory] = useState<string | null>(null)
+    const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+
+    const handleLogout = useCallback(async () => {
+        try {
+            await fetch('/api/auth/logout', { method: 'POST' });
+        } finally {
+            setIsAuthenticated(false);
+            setStats(null);
+            setStatus(null);
+            setStreams([]);
+            setIsAddModalOpen(false);
+        }
+    }, []);
+
+    const handleAddStream = async (newStream: NewStream) => {
+        const response = await fetch('/api/streams', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(newStream),
+        });
+
+        if (!response.ok) {
+            const data = await response.json();
+            throw new Error(data.message || 'Failed to add stream');
+        }
+
+        const addedStream = await response.json();
+        setStreams(prev => [...prev, addedStream]);
+    };
+
+    useEffect(() => {
+        fetch('/api/status')
+            .then(res => {
+                if (res.ok) {
+                    setIsAuthenticated(true);
+                }
+            })
+            .finally(() => {
+                setIsCheckingAuth(false);
+            });
+    }, []);
 
     useEffect(
         () => {
+            if (!isAuthenticated) return;
+
             const refreshStatus = () => {
                 fetch('/api/status')
-                    .then((response) => response.json())
+                    .then((response) => {
+                        if (response.status === 401) {
+                            setIsAuthenticated(false);
+                            throw new Error('Unauthorized');
+                        }
+                        return response.json()
+                    })
                     .then((payload: StatusPayload) => setStatus(payload))
-                    .catch(() => setError('Failed to load server status'))
+                    .catch((err) => {
+                        if (err.message !== 'Unauthorized') {
+                            setError('Failed to load server status')
+                        }
+                    })
             }
 
             refreshStatus()
@@ -28,9 +88,19 @@ export function App() {
             )
 
             fetch('/api/streams')
-                .then(res => res.json())
+                .then(res => {
+                    if (res.status === 401) {
+                        setIsAuthenticated(false);
+                        throw new Error('Unauthorized');
+                    }
+                    return res.json()
+                })
                 .then(data => setStreams(data))
-                .catch(() => setError('Failed to load streams'))
+                .catch((err) => {
+                    if (err.message !== 'Unauthorized') {
+                        setError('Failed to load streams')
+                    }
+                })
 
             const eventSource = new EventSource('/api/stats/sse')
             eventSource.addEventListener(
@@ -41,7 +111,8 @@ export function App() {
                 }
             )
 
-            eventSource.onerror = () => {
+            eventSource.onerror = (e) => {
+                console.error('SSE Error', e);
                 setError('SSE connection interrupted')
                 eventSource.close()
             }
@@ -51,27 +122,67 @@ export function App() {
                 eventSource.close()
             }
         },
-        []
+        [isAuthenticated]
     )
+
+    if (isCheckingAuth) {
+        return <div className="loading">Checking authentication...</div>;
+    }
+
+    if (!isAuthenticated) {
+        return <Login onLoginSuccess={() => setIsAuthenticated(true)} />;
+    }
 
     return (
         <main className="container">
-            <StatusHeader status={status} stats={stats}/>
+            <StatusHeader status={status} stats={stats} onLogout={handleLogout}/>
 
             {selectedDirectory ? (
                 <DirectoryView alias={selectedDirectory} onClose={() => setSelectedDirectory(null)}/>
             ) : (
-                <div className="streams-grid">
-                    {streams.map(stream => (
-                        <StreamCard
-                            stream={stream}
-                            onShowDirectory={(alias) => setSelectedDirectory(alias)}
-                        />
-                    ))}
-                </div>
+                <>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                        <button onClick={() => setIsAddModalOpen(true)} className="add-stream-btn">
+                            <Plus size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
+                            Add Stream
+                        </button>
+                    </div>
+                    <div className="streams-grid">
+                        {streams.map(stream => (
+                            <StreamCard
+                                key={stream.id}
+                                stream={stream}
+                                onShowDirectory={(alias) => setSelectedDirectory(alias)}
+                            />
+                        ))}
+                    </div>
+                </>
+            )}
+
+            {isAddModalOpen && (
+                <AddStreamModal
+                    onClose={() => setIsAddModalOpen(false)}
+                    onAdd={handleAddStream}
+                />
             )}
 
             {error ? <p className="error" style={{marginTop: '2rem'}}>{error}</p> : null}
+            <style>{`
+                .add-stream-btn {
+                    background-color: #10b981;
+                    color: white;
+                    border: none;
+                    padding: 0.5rem 1rem;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    display: flex;
+                    align-items: center;
+                }
+                .add-stream-btn:hover {
+                    background-color: #059669;
+                }
+            `}</style>
         </main>
     )
 }

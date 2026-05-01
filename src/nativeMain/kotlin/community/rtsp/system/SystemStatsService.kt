@@ -21,7 +21,7 @@ class SystemStatsService {
             memoryTotalBytes = memory.second,
             diskUsedBytes = disk.first,
             diskTotalBytes = disk.second,
-            timestamp = time(null).toLong() * 1000
+            timestamp = time(null) * 1000
         )
     }
 
@@ -40,8 +40,8 @@ class SystemStatsService {
             return@memScoped 0L to 0L
         }
 
-        val total = stats.f_blocks.toLong() * stats.f_bsize.toLong()
-        val available = stats.f_bavail.toLong() * stats.f_bsize.toLong()
+        val total = stats.f_blocks.toLong() * stats.f_bsize
+        val available = stats.f_bavail.toLong() * stats.f_bsize
         (total - available) to total
     }
 

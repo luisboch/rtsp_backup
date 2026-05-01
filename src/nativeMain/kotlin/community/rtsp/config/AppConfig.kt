@@ -1,14 +1,16 @@
 package community.rtsp.config
 
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.toKString
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
+import platform.posix.getenv
 
+@OptIn(ExperimentalForeignApi::class)
 @Serializable
-data class AppConfig(
+data class AppConfig  constructor(
     val properties: Properties,
-    val streams: List<StreamConfig>
+    val dataDir: String = getenv("DATA_DIR")?.toKString() ?: "/data"
 )
 
 @Serializable
@@ -31,13 +33,4 @@ data class AutoClean(
     val enabled: Boolean,
     @SerialName("keep_days")
     val keepDays: Int
-)
-
-@OptIn(ExperimentalUuidApi::class)
-@Serializable
-data class StreamConfig(
-    val id: String = Uuid.random().toString(),
-    val alias: String,
-    val url: String,
-    val directory: String
 )

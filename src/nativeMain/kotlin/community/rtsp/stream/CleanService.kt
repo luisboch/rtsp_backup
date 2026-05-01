@@ -1,5 +1,6 @@
 package community.rtsp.stream
 
+import community.rtsp.auth.AuthRepository
 import community.rtsp.config.AppConfig
 import kotlinx.cinterop.*
 import kotlinx.coroutines.*
@@ -7,9 +8,11 @@ import platform.posix.*
 import kotlin.time.Duration.Companion.hours
 
 @OptIn(ExperimentalForeignApi::class)
-class CleanService(private val config: AppConfig) {
+class CleanService(
+    private val config: AppConfig,
+    private val authRepository: AuthRepository
+) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private val dataDir = getenv("DATA_DIR")?.toKString() ?: "/data"
 
     fun start() {
         if (!config.properties.autoClean.enabled) {
@@ -38,8 +41,8 @@ class CleanService(private val config: AppConfig) {
         val currentTime = time(null)
         val maxAgeSeconds = keepDays * 24 * 60 * 60
 
-        config.streams.forEach { stream ->
-            val backupDir = "$dataDir/${stream.directory}/backup"
+        authRepository.getAllStreams().forEach { stream ->
+            val backupDir = "${config.dataDir}/${stream.owner_id}/${stream.directory}/backup"
             println("Checking for old backups in: $backupDir")
             
             val dir = opendir(backupDir)

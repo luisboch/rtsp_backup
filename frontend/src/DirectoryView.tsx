@@ -8,7 +8,13 @@ export function DirectoryView({alias, onClose}: { alias: string, onClose: () => 
     useEffect(
         () => {
             fetch(`/api/files/${alias}`)
-                .then(res => res.json())
+                .then(res => {
+                    if (res.status === 401) {
+                        window.location.reload(); // Simple way to trigger auth check in App.tsx
+                        return [];
+                    }
+                    return res.json()
+                })
                 .then(data => {
                     setFiles(data)
                     setLoading(false)
