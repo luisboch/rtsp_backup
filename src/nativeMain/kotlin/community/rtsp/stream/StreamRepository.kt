@@ -13,7 +13,7 @@ class StreamRepository(
     // Stream access methods
     fun getAllStreams() = streamQueries.getAllStreams().executeAsList()
 
-    fun getStreamsForUser(userId: Long) = streamQueries.getStreamsForUser(userId, userId, userId)
+    fun getStreamsForUser(userId: Long) = streamQueries.getStreamsForUser(userId)
 
     fun addStream(ownerId: Long, alias: String, url: String, dir: String) {
         streamQueries.insertStream(ownerId, alias, url, dir)

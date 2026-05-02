@@ -30,8 +30,8 @@ SELECT s.*,
        CASE WHEN sf.stream_id IS NOT NULL THEN 1 ELSE 0 END AS is_favorite
 FROM stream s
 LEFT JOIN stream_share ss ON s.id = ss.stream_id
-LEFT JOIN stream_favorite sf ON s.id = sf.stream_id AND sf.user_id = ?
-WHERE (s.owner_id = ? OR ss.user_id = ?) AND s.active = 1
+LEFT JOIN stream_favorite sf ON s.id = sf.stream_id AND sf.user_id = :userId
+WHERE (s.owner_id =: userId OR ss.user_id = :userId) AND s.active = 1
 ORDER BY is_favorite DESC, s.id DESC;
 
 getStreamByAlias:

@@ -32,6 +32,7 @@ The system uses the following main tables:
 - `stream`: Stores configured RTSP streams (id, owner_id, alias, rtsp_url, directory).
 - `session`: Manages user sessions (id, user_id, token, created_at).
 - `stream_share`: Manages shared access to streams.
+- `stream_favorite`: Tracks user favorites for streams (own or shared).
 
 ## Environment Variables
 - `HOST`: Server host address (default: `0.0.0.0`).
@@ -64,7 +65,8 @@ The system uses the following main tables:
   3. Ensure the route is protected by `authenticate("auth-session")` if needed.
 - **Database Changes**:
   1. Add/modify `.sq` files in `src/nativeMain/sqldelight`.
-  2. Add a migration file `<<version>>.sqm` in `src/nativeMain/sqldelight/migrations` if modifying existing structure.
+  2. Always use named parameters for SQL queries ( `:paramName` instead of `?`). 
+  3. Add a migration file `<<version>>.sqm` in `src/nativeMain/sqldelight/migrations` if modifying existing structure.
 
 ## FFmpeg Process Management
 Recording is managed by `StreamBackupService`.
