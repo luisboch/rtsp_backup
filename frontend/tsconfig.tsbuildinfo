@@ -1,1 +1,1 @@
-{"root":["./src/AddStreamModal.tsx","./src/App.tsx","./src/DirectoryView.tsx","./src/Login.tsx","./src/StatusHeader.tsx","./src/StreamCard.tsx","./src/main.tsx","./src/types.ts"],"version":"5.9.3"}
+{"root":["./src/AddStreamModal.tsx","./src/App.tsx","./src/DirectoryView.tsx","./src/Login.tsx","./src/StatusHeader.tsx","./src/StreamCard.tsx","./src/VideoPlayer.tsx","./src/main.tsx","./src/types.ts","./src/hooks/useAuth.ts","./src/hooks/useStreams.ts","./src/hooks/useSystemStats.ts"],"version":"5.9.3"}

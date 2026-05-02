@@ -21,7 +21,7 @@ class AuthRepository(
 
     fun createUser(username: String, password: String): Boolean {
         // In a real app, use a proper salt
-        val salt = "fixed_salt_for_demo" 
+        val salt = "fixed_salt_for_demo"
         val hash = passwordHasher.hashPassword(password, salt)
         return try {
             userQueries.insertUser(username, hash)
@@ -54,10 +54,6 @@ class AuthRepository(
         streamShareQueries.shareStream(streamId, targetUserId)
     }
 
-    fun getStreamByAlias(alias: String, userId: Long): Stream? {
-        return streamQueries.getStreamByAlias(alias, userId).executeAsOneOrNull()
-    }
-
     fun unshareStream(streamId: Long, userId: Long) {
         streamShareQueries.unshareStream(streamId, userId)
     }
@@ -66,16 +62,15 @@ class AuthRepository(
         streamShareQueries.deleteAllShares(streamId)
     }
 
-    fun deleteStream(streamId: Long, ownerId: Long) {
-        // In a real app, check ownership first
-        streamQueries.deleteStream(streamId)
-    }
-
     fun inactivateStream(streamId: Long) {
         streamQueries.inactivateStream(streamId)
     }
 
-    fun getStreamById(id: Long): Stream? {
-        return streamQueries.getStreamById(id).executeAsOneOrNull()
+    fun getStreamById(id: Long, userId: Long): Stream? {
+        return streamQueries.getStreamById(id, userId).executeAsOneOrNull()
+    }
+
+    fun getStreamByAlias(alias: String, userId: Long): Stream? {
+        return streamQueries.getStreamByAlias(alias, userId).executeAsOneOrNull()
     }
 }

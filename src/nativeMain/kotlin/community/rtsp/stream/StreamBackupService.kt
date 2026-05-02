@@ -3,6 +3,7 @@ package community.rtsp.stream
 import community.rtsp.auth.AuthRepository
 import community.rtsp.config.AppConfig
 import community.rtsp.db.Stream
+import community.rtsp.system.FfmpegCommandBuilder
 import kotlinx.coroutines.*
 import platform.posix.*
 import kotlinx.cinterop.*
@@ -70,25 +71,28 @@ class StreamBackupService(
         val rtspUrl = stream.rtsp_url.trim().removeSuffix("?")
         val segmentTime = config.properties.segmentTime.toString()
         
-        val args = listOf(
-            "ffmpeg", "-hide_banner", "-loglevel", "error",
-            "-rtsp_transport", "tcp",
-            "-i", rtspUrl,
-            "-map", "0:v",
-            "-c:v", "copy", "-an",
-            "-f", "hls", 
-            "-hls_time", "5", 
-            "-hls_list_size", "5", 
-            "-hls_flags", "delete_segments", 
-            "$liveDir/index.m3u8",
-            "-map", "0:v",
-            "-c:v", "copy", "-an",
-            "-f", "segment", 
-            "-segment_time", segmentTime, 
-            "-segment_atclocktime", "1", 
-            "-strftime", "1", 
-            "$backupDir/${stream.directory}_%Y-%m-%d_%H-%M-%S.mp4"
-        )
+        val args = FfmpegCommandBuilder()
+            .hideBanner()
+            .logLevel("error")
+            .rtspTransport("tcp")
+            .input(rtspUrl)
+            .map("0:v")
+            .videoCodec("copy")
+            .noAudio()
+            .format("hls")
+            .hlsTime(5)
+            .hlsListSize(5)
+            .hlsFlags("delete_segments")
+            .output("$liveDir/index.m3u8")
+            .map("0:v")
+            .videoCodec("copy")
+            .noAudio()
+            .format("segment")
+            .segmentTime(segmentTime)
+            .segmentAtClockTime(true)
+            .strftime(true)
+            .output("$backupDir/${stream.directory}_%Y-%m-%d_%H-%M-%S.mp4")
+            .build()
 
         val pid = fork()
         if (pid == 0) {

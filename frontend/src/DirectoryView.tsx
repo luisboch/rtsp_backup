@@ -1,13 +1,14 @@
 import {useEffect, useState} from "react";
 import {X} from "lucide-react";
+import {StreamInfo} from "./types";
 
-export function DirectoryView({alias, onClose}: { alias: string, onClose: () => void }) {
+export function DirectoryView({stream, onClose}: { stream: StreamInfo, onClose: () => void }) {
     const [files, setFiles] = useState<string[]>([])
     const [loading, setLoading] = useState(true)
 
     useEffect(
         () => {
-            fetch(`/api/files/${alias}`)
+            fetch(`/api/files/${stream.id}`)
                 .then(res => {
                     if (res.status === 401) {
                         window.location.reload(); // Simple way to trigger auth check in App.tsx
@@ -20,13 +21,13 @@ export function DirectoryView({alias, onClose}: { alias: string, onClose: () => 
                     setLoading(false)
                 })
         },
-        [alias]
+        [stream.id]
     )
 
     return (
         <div className="directory-view card">
             <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                <h2 style={{margin: 0}}>Files for {alias}</h2>
+                <h2 style={{margin: 0}}>Files for {stream.alias}</h2>
                 <button onClick={onClose} style={{background: '#334155'}}>
                     <X size={20}/>
                 </button>
@@ -38,10 +39,10 @@ export function DirectoryView({alias, onClose}: { alias: string, onClose: () => 
                     {files.map(file => (
                         <li key={file} className="file-item">
                             <span>{file.split('/').pop()}</span>
-                            <a href={`/api/video/${file}`} target="_blank" rel="noreferrer">
+                            <a href={`/api/video/${stream.id}/${file}`} target="_blank" rel="noreferrer">
                                 Open
                             </a>
-                            <a href={`/api/video/${file}?download=true`} target="_blank" rel="noreferrer">
+                            <a href={`/api/video/${stream.id}/${file}?download=true`} target="_blank" rel="noreferrer">
                                 Download
                             </a>
                         </li>

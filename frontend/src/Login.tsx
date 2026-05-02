@@ -23,7 +23,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
         formData.append('password', password);
 
         try {
-            const url = isLogin ? '/api/auth/login' : '/api/auth/register';
+            const url = isLogin ? '/api/p/auth/login' : '/api/p/auth/register';
             const response = await fetch(url, {
                 method: 'POST',
                 headers: {

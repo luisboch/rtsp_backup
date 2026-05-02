@@ -1,167 +1,32 @@
-import {useEffect, useState, useCallback} from 'react'
+import {useState, useCallback} from 'react'
 import {StreamCard} from "./StreamCard";
 import {DirectoryView} from "./DirectoryView";
 import {StatusHeader} from "./StatusHeader";
 import {Login} from "./Login";
-import {StatusPayload, SystemStats, StreamInfo, NewStream} from "./types";
 import {AddStreamModal} from "./AddStreamModal";
 import {Plus} from "lucide-react";
+import {useAuth} from "./hooks/useAuth";
+import {useSystemStats} from "./hooks/useSystemStats";
+import {useStreams} from "./hooks/useStreams";
 
 
 export function App() {
-    const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false)
-    const [isCheckingAuth, setIsCheckingAuth] = useState<boolean>(true)
-    const [stats, setStats] = useState<SystemStats | null>(null)
-    const [status, setStatus] = useState<StatusPayload | null>(null)
-    const [streams, setStreams] = useState<StreamInfo[]>([])
-    const [error, setError] = useState<string | null>(null)
-    const [selectedDirectory, setSelectedDirectory] = useState<string | null>(null)
+    const { isAuthenticated, isCheckingAuth, setIsAuthenticated, logout } = useAuth();
+    const onUnauthorized = useCallback(() => setIsAuthenticated(false), [setIsAuthenticated]);
+
+    const { stats, status, error: statsError } = useSystemStats(isAuthenticated, onUnauthorized);
+    const { streams, error: streamsError, addStream, deleteStream, shareStream } = useStreams(isAuthenticated, onUnauthorized);
+
+    const [selectedStream, setSelectedStream] = useState<StreamInfo | null>(null)
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
 
+    const error = statsError || streamsError;
+
     const handleLogout = useCallback(async () => {
-        try {
-            await fetch('/api/auth/logout', { method: 'POST' });
-        } finally {
-            setIsAuthenticated(false);
-            setStats(null);
-            setStatus(null);
-            setStreams([]);
-            setIsAddModalOpen(false);
-        }
-    }, []);
-
-    const handleAddStream = async (newStream: NewStream) => {
-        const response = await fetch('/api/streams', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(newStream),
-        });
-
-        if (!response.ok) {
-            const data = await response.json();
-            throw new Error(data.message || 'Failed to add stream');
-        }
-
-        const addedStream = await response.json();
-        setStreams(prev => [...prev, addedStream]);
-    };
-
-    const handleDeleteStream = async (stream: StreamInfo) => {
-        if (!window.confirm('Are you sure you want to remove this stream?')) return;
-
-        try {
-            const response = await fetch(`/api/streams/${stream.id}`, {
-                method: 'DELETE',
-            });
-
-            if (!response.ok) {
-                const data = await response.json();
-                throw new Error(data.message || 'Failed to delete stream');
-            }
-
-            setStreams(prev => prev.filter(s => s.id !== stream.id));
-        } catch (err: any) {
-            setError(err.message);
-        }
-    };
-
-    const handleShareStream = async (stream: StreamInfo, username: string) => {
-        try {
-            const response = await fetch(`/api/streams/${stream.id}/share`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username }),
-            });
-
-            const data = await response.json();
-            if (response.ok) {
-                alert('Stream shared successfully!');
-            } else {
-                alert(data.message || 'Failed to share stream');
-            }
-        } catch (err) {
-            alert('Connection error while sharing');
-        }
-    };
-
-    useEffect(() => {
-        fetch('/api/status')
-            .then(res => {
-                if (res.ok) {
-                    setIsAuthenticated(true);
-                }
-            })
-            .finally(() => {
-                setIsCheckingAuth(false);
-            });
-    }, []);
-
-    useEffect(
-        () => {
-            if (!isAuthenticated) return;
-
-            const refreshStatus = () => {
-                fetch('/api/status')
-                    .then((response) => {
-                        if (response.status === 401) {
-                            setIsAuthenticated(false);
-                            throw new Error('Unauthorized');
-                        }
-                        return response.json()
-                    })
-                    .then((payload: StatusPayload) => setStatus(payload))
-                    .catch((err) => {
-                        if (err.message !== 'Unauthorized') {
-                            setError('Failed to load server status')
-                        }
-                    })
-            }
-
-            refreshStatus()
-            const statusInterval = setInterval(
-                refreshStatus,
-                5000
-            )
-
-            fetch('/api/streams')
-                .then(res => {
-                    if (res.status === 401) {
-                        setIsAuthenticated(false);
-                        throw new Error('Unauthorized');
-                    }
-                    return res.json()
-                })
-                .then(data => setStreams(data))
-                .catch((err) => {
-                    if (err.message !== 'Unauthorized') {
-                        setError('Failed to load streams')
-                    }
-                })
-
-            const eventSource = new EventSource('/api/stats/sse')
-            eventSource.addEventListener(
-                'stats',
-                (event) => {
-                    const payload = JSON.parse((event as MessageEvent).data) as SystemStats
-                    setStats(payload)
-                }
-            )
-
-            eventSource.onerror = (e) => {
-                console.error('SSE Error', e);
-                setError('SSE connection interrupted')
-                eventSource.close()
-            }
-
-            return () => {
-                clearInterval(statusInterval)
-                eventSource.close()
-            }
-        },
-        [isAuthenticated]
-    )
+        await logout();
+        setSelectedStream(null);
+        setIsAddModalOpen(false);
+    }, [logout]);
 
     if (isCheckingAuth) {
         return <div className="loading">Checking authentication...</div>;
@@ -175,8 +40,8 @@ export function App() {
         <main className="container">
             <StatusHeader status={status} stats={stats} onLogout={handleLogout}/>
 
-            {selectedDirectory ? (
-                <DirectoryView alias={selectedDirectory} onClose={() => setSelectedDirectory(null)}/>
+            {selectedStream ? (
+                <DirectoryView stream={selectedStream} onClose={() => setSelectedStream(null)}/>
             ) : (
                 <>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
@@ -190,9 +55,9 @@ export function App() {
                             <StreamCard
                                 key={stream.id}
                                 stream={stream}
-                                onShowDirectory={(alias) => setSelectedDirectory(alias)}
-                                onDelete={handleDeleteStream}
-                                onShare={handleShareStream}
+                                onShowDirectory={(stream) => setSelectedStream(stream)}
+                                onDelete={deleteStream}
+                                onShare={shareStream}
                             />
                         ))}
                     </div>
@@ -202,7 +67,7 @@ export function App() {
             {isAddModalOpen && (
                 <AddStreamModal
                     onClose={() => setIsAddModalOpen(false)}
-                    onAdd={handleAddStream}
+                    onAdd={addStream}
                 />
             )}
 

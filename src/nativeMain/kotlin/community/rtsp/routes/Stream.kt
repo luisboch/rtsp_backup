@@ -1,12 +1,13 @@
 package community.rtsp.routes
 
-import community.rtsp.AddStreamRequest
-import community.rtsp.ShareStreamRequest
+import community.rtsp.dto.AddStreamRequest
+import community.rtsp.dto.ShareStreamRequest
 import community.rtsp.auth.AuthRepository
 import community.rtsp.auth.UserSession
 import community.rtsp.dto.StreamDto.Companion.toDto
 import community.rtsp.routes.util.bufferedRead
 import community.rtsp.stream.StreamBackupService
+import community.rtsp.system.FfmpegCommandBuilder
 import community.rtsp.util.GenerateRandomService
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -27,88 +28,15 @@ fun Route.streamRoutes(
     randomService: GenerateRandomService,
     backupService: StreamBackupService,
 ) {
-    get("/api/stream/proxy/{uuid}") {
-        val uuid = call.parameters["uuid"]
-        val stream = authRepository.getAllStreams().find { it.alias == uuid }
-
-        if (stream == null) {
-            call.respond(HttpStatusCode.NotFound)
-            return@get
-        }
-
-        call.response.headers.append(
-            HttpHeaders.CacheControl,
-            "no-store, no-cache, must-revalidate, pre-check=0, post-check=0, max-age=0"
-        )
-        call.response.headers.append(HttpHeaders.Connection, "keep-alive")
-        call.response.headers.append(
-            HttpHeaders.ContentType,
-            "multipart/x-mixed-replace; boundary=ffmpeg"
-        )
-
-        // 2. RespondBytesWriter sem formatação extra (sem SSE)
-        call.respondBytesWriter {
-            var ffmpegProcess: CPointer<FILE>? = null
-            println("Starting Direct MJPEG stream for: $uuid")
-
-            try {
-                val args = listOf(
-                    "ffmpeg",
-                    "-hide_banner", "-loglevel", "error",
-                    "-rtsp_transport", "tcp",
-                    "-i", stream.rtsp_url,
-                    "-an",
-                    "-vcodec", "mjpeg",
-                    "-pix_fmt", "yuvj420p",
-                    "-f", "mpjpeg",
-                    "-q", "5",
-                    "-r", "5",
-                    "pipe:1"
-                )
-
-                val escapedCmd = args.joinToString(" ") { arg ->
-                    val cleanArg = if (arg.startsWith("rtsp://")) arg.trim().removeSuffix("?") else arg
-                    "'" + cleanArg.replace("'", "'\\''") + "'"
-                }
-
-                println("Executing command: $escapedCmd")
-
-                ffmpegProcess = popen(escapedCmd, "r")
-                if (ffmpegProcess == null) {
-                    println("Failed to start ffmpeg process for: $uuid")
-                    return@respondBytesWriter
-                }
-
-                val buffer = ByteArray(16384)
-                bufferedRead(buffer, ffmpegProcess)
-
-            } finally {
-                ffmpegProcess?.let { pclose(it) }
-                println("Closed Direct MJPEG stream for: $uuid")
-            }
-        }
-    }
-
-
     get("/api/streams") {
-        val session = call.principal<UserSession>()
-        val userId = session?.userId
-        if (userId != null) {
-            val streams = authRepository.getStreamsForUser(userId)
-                .executeAsList().map { stream -> stream.toDto() }
-            call.respond(streams)
-        } else {
-            call.respond(HttpStatusCode.Unauthorized)
-        }
+        val userId = call.principal<UserSession>()!!.userId
+        val streams = authRepository.getStreamsForUser(userId)
+            .executeAsList().map { stream -> stream.toDto() }
+        call.respond(streams)
     }
 
     post("/api/streams") {
-        val session = call.principal<UserSession>()
-        val userId = session?.userId
-        if (userId == null) {
-            call.respond(HttpStatusCode.Unauthorized)
-            return@post
-        }
+        val userId = call.principal<UserSession>()!!.userId
 
         val request = try {
             call.receive<AddStreamRequest>()
@@ -150,12 +78,7 @@ fun Route.streamRoutes(
     }
 
     delete("/api/streams/{id}") {
-        val session = call.principal<UserSession>()
-        val userId = session?.userId
-        if (userId == null) {
-            call.respond(HttpStatusCode.Unauthorized)
-            return@delete
-        }
+        val userId = call.principal<UserSession>()!!.userId
 
         val streamId = call.parameters["id"]?.toLongOrNull()
 
@@ -165,7 +88,7 @@ fun Route.streamRoutes(
             return@delete
         }
 
-        val stream = authRepository.getStreamById(streamId)
+        val stream = authRepository.getStreamById(streamId, userId)
         if (stream == null) {
             call.respond(HttpStatusCode.NoContent, mapOf("message" to "Stream not found"))
             return@delete
@@ -185,12 +108,7 @@ fun Route.streamRoutes(
     }
 
     post("/api/streams/{id}/share") {
-        val session = call.principal<UserSession>()
-        val userId = session?.userId
-        if (userId == null) {
-            call.respond(HttpStatusCode.Unauthorized)
-            return@post
-        }
+        val userId = call.principal<UserSession>()!!.userId
 
         val streamId = call.parameters["id"]?.toLongOrNull()
         if (streamId == null) {

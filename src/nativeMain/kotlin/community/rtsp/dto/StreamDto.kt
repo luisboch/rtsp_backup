@@ -21,3 +21,14 @@ data class StreamDto(
         )
     }
 }
+
+@Serializable
+data class AddStreamRequest(
+    val alias: String,
+    val rtspUrl: String
+)
+
+@Serializable
+data class ShareStreamRequest(
+    val username: String
+)

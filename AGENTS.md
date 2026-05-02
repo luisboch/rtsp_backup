@@ -1,69 +1,80 @@
-# Project Overview
+# RTSP Backup - Project Guide
+
+## Project Overview
 RTSP Backup is a system designed to record RTSP streams, manage backups, and provide a web-based dashboard for monitoring and viewing the recorded video content.
 
 ## Architecture
-The project is a full-stack application consisting of:
+Full-stack application: Kotlin Native (Backend) + React (Frontend).
 
-### Backend (Kotlin Multiplatform / Ktor)
-- **Language:** Kotlin
-- **Framework:** Ktor (Server-side)
-- **Key Features:**
-  - RTSP stream recording using `ffmpeg`.
-  - Stream proxying and video serving.
-  - API for system statistics, configuration, and file management.
-  - SSE (Server-Sent Events) for real-time stats updates.
-  - Basic/Session Authentication for security.
-  - Cleanup service for managing disk space.
-- **Core Components:**
-  - `community.rtsp.stream.StreamService`: Manages the recording of streams.
-  - `community.rtsp.stream.CleanService`: Manages disk usage and cleanup.
-  - `community.rtsp.system.FfmpegCliService`: Interacts with `ffmpeg`.
-  - `community.rtsp.system.SystemStatsService`: Collects system information (CPU, Memory, Disk).
-  - `community.rtsp.config.ConfigLoader`: Loads application configuration from `config.json`.
-  - `community.rtsp.auth.SessionService`: Manages user authentication and sessions.
+### Backend (Kotlin/Native & Ktor)
+- **Key Services**:
+  - `StreamService`: Manages the recording lifecycle.
+  - `CleanService`: Manages disk usage and cleanup of old segments.
+  - `SystemStatsService`: Collects CPU, Memory, and Disk metrics.
+  - `SessionService`: Manages user authentication and sessions.
+- **Database**: SQLite with SQLDelight for persistence.
+- **Interop**: Uses Posix C functions for filesystem access and process management.
 
-### Frontend (React)
-- **Language:** TypeScript
-- **Framework:** React
-- **Build Tool:** Vite
-- **Key Features:**
-  - Dashboard for viewing active streams and system status.
-  - Video player for reviewing recorded files (using `hls.js`).
-  - Real-time monitoring via SSE.
-  - Directory view for navigating backup files.
-  - Authentication login page.
-- **Key Components:**
-  - `App.tsx`: Main application entry and routing.
-  - `StreamCard.tsx`: Represents an individual stream and its status.
-  - `DirectoryView.tsx`: Navigation and playback for recorded files.
-  - `StatusHeader.tsx`: Displays system health and stats.
-  - `Login.tsx`: User login interface.
-
-## Development Commands
-
-### Backend
-The backend is built using Gradle as a Kotlin Native application.
-- Build/Run (Debug): `./gradlew runDebugExecutableNative`
-- Build (Release): `./gradlew linkReleaseExecutableNative`
-
-### Frontend
-Navigate to the `frontend` directory.
-- Install dependencies: `npm install`
-- Start development server: `npm run dev`
-- Build for production: `npm run build`
+### Frontend (React & Vite)
+- **Tech Stack**: TypeScript, React, Lucide-icons, hls.js.
+- **Communication**: REST API for management + SSE for real-time statistics.
 
 ## Directory Structure
 - `src/nativeMain/kotlin/community/rtsp`: Backend source code.
-  - `auth/`: Authentication logic and routes.
-  - `config/`: Configuration loading and data classes.
-  - `routes/`: API endpoint definitions (Live, Stream, Video).
-  - `stream/`: Recording and cleanup services.
-  - `system/`: System statistics and ffmpeg interaction.
-- `frontend/src`: Frontend source code.
-- `frontend/package.json`: Frontend dependencies and scripts.
-- `conf/`: Configuration files (e.g., `config.json.sample`).
-- `data/`: Default directory for recorded video segments.
+- `src/nativeMain/sqldelight`: Database schemas and migrations.
+- `frontend/src`: Frontend React application.
+- `conf/`: Configuration templates (e.g., `config.json.sample`).
+- `data/`: Default storage for video files (segments and HLS playlists).
 
+## Database Schema Summary
+The system uses the following main tables:
+- `user`: Stores user credentials (id, username, password_hash).
+- `stream`: Stores configured RTSP streams (id, owner_id, alias, rtsp_url, directory).
+- `session`: Manages user sessions (id, user_id, token, created_at).
+- `stream_share`: Manages shared access to streams.
 
-## Code guidelines
-- Do not expose the sqldelight generated classes to the frontend, use the DTOs (like StreamDto.kt) 
+## Environment Variables
+- `HOST`: Server host address (default: `0.0.0.0`).
+- `PORT`: Server port (default: `8080`).
+- `CONFIG_PATH`: Path to the `config.json` file.
+- `DATA_DIR`: Root directory for recorded video data (default: `/data`).
+
+## Core API Endpoints
+
+### Authentication
+- `POST /api/auth/register`: Register a new user (Form params: `username`, `password`).
+- `POST /api/auth/login`: Session authentication (Form params: `username`, `password`).
+- `POST /api/auth/logout`: Invalidate current session.
+
+### Streams & Management
+- `GET /api/streams`: List all streams for the authenticated user.
+- `POST /api/streams`: Add a new stream (JSON: `alias`, `rtspUrl`).
+- `GET /api/status`: Overall system health and recording status.
+- `GET /api/stats/sse`: Real-time system metrics via Server-Sent Events.
+
+### Video & Live
+- `GET /api/live/{alias}/live/index.m3u8`: HLS stream endpoint for a specific stream.
+- `GET /api/video/{path}`: Access to recorded mp4 files.
+- `GET /api/files/{alias}`: List recorded mp4 files for a specific stream.
+
+## Development Workflow
+- **Adding an API Endpoint**:
+  1. Define the route in `src/nativeMain/kotlin/community/rtsp/routes/` or `plugins/Routing.kt`.
+  2. Use DTOs in `src/nativeMain/kotlin/community/rtsp/dto/` for request/response bodies.
+  3. Ensure the route is protected by `authenticate("auth-session")` if needed.
+- **Database Changes**:
+  1. Add/modify `.sq` files in `src/nativeMain/sqldelight`.
+  2. Add a migration file `<<version>>.sqm` in `src/nativeMain/sqldelight/migrations` if modifying existing structure.
+
+## FFmpeg Process Management
+Recording is managed by `StreamBackupService`.
+- **Process**: One FFmpeg process is spawned per stream using `fork()` and `execvp()`.
+- **Monitoring**: The system monitors the PID and restarts the process if it terminates.
+- **Output**: FFmpeg is configured to produce both an HLS stream (for live view) and mp4 segments (for backup).
+- **Storage**: Files are stored in `{DATA_DIR}/{user_id}/{stream_alias}/[live|backup]`.
+
+## Tips for AI Assistants
+- **C-Interop**: The project uses Kotlin/Native C-interop. Be mindful of `memScoped`, `alloc`, and C-pointers when working with filesystem or process functions.
+- **DTOs**: Always use DTOs for frontend communication; never expose SQLDelight generated classes directly.
+- **Memory**: Kotlin/Native memory management differs from JVM. Avoid leaking C-allocated memory.
+- **Paths**: Many filesystem operations use Posix functions (`access`, `fopen`, `popen`). Ensure paths are correctly handled.

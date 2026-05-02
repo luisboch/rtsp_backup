@@ -13,14 +13,9 @@ INSERT INTO stream (owner_id, alias, rtsp_url, directory, active)
 VALUES (?, ?, ?, ?, 1);
 
 getStreamById:
-SELECT * FROM stream
-WHERE id = ?;
-
-getStreamByAlias:
 SELECT s.* FROM stream s
 LEFT JOIN stream_share ss ON s.id = ss.stream_id
-WHERE alias = :alias AND (s.owner_id = :userId OR ss.user_id = :userId)
-;
+WHERE id = :id AND (s.owner_id = :userId OR ss.user_id = :userId);
 
 getStreamsByOwner:
 SELECT * FROM stream
@@ -40,3 +35,8 @@ getStreamsForUser:
 SELECT s.* FROM stream s
 LEFT JOIN stream_share ss ON s.id = ss.stream_id
 WHERE (s.owner_id = ? OR ss.user_id = ?) AND s.active = 1;
+
+getStreamByAlias:
+SELECT s.* FROM stream s
+LEFT JOIN stream_share ss ON s.id = ss.stream_id
+WHERE alias = :alias AND (s.owner_id = :userId OR ss.user_id = :userId);

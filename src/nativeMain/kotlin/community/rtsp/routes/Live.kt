@@ -1,5 +1,6 @@
 package community.rtsp.routes
 
+import community.rtsp.auth.AuthRepository
 import community.rtsp.auth.UserSession
 import community.rtsp.config.AppConfig
 import community.rtsp.routes.util.streamFileToChannel
@@ -14,12 +15,19 @@ import platform.posix.access
 import platform.posix.fopen
 
 @OptIn(ExperimentalForeignApi::class)
-fun Route.live(config: AppConfig) {
-    get("/api/live/{path...}") {
-        val session = call.principal<UserSession>()
-        val userId = session?.userId
-        if (userId == null) {
-            call.respond(HttpStatusCode.Unauthorized)
+fun Route.live(config: AppConfig, authRepository: AuthRepository) {
+    get("/api/live/{streamId}/{path...}") {
+        val userId = call.principal<UserSession>()!!.userId
+        val streamId = call.parameters["streamId"]?.toLongOrNull()
+
+        if (streamId == null) {
+            call.respond(HttpStatusCode.BadRequest)
+            return@get
+        }
+
+        val stream = authRepository.getStreamById(streamId, userId)
+        if (stream == null) {
+            call.respond(HttpStatusCode.NotFound)
             return@get
         }
 
@@ -29,7 +37,7 @@ fun Route.live(config: AppConfig) {
             return@get
         }
 
-        val file = "${config.dataDir}/$userId/$path"
+        val file = "${config.dataDir}/${stream.owner_id}/$path"
         if (access(file, F_OK) != 0) {
             call.respond(HttpStatusCode.NotFound)
             return@get

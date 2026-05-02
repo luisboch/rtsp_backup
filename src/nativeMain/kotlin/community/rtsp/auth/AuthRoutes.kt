@@ -22,7 +22,7 @@ fun Route.authRoutes(
     sessionService: SessionService,
     randomService: GenerateRandomService
 ) {
-    route("/api/auth") {
+    route("/auth") {
         post("/login") {
             val params = call.receiveParameters()
             val username = params["username"] ?: return@post call.respond(HttpStatusCode.BadRequest)
