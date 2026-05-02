@@ -1,12 +1,13 @@
 import {useEffect, useRef} from "react";
-import {FolderOpen, Trash2} from "lucide-react";
+import {FolderOpen, Share2, Trash2} from "lucide-react";
 import {StreamInfo} from "./types";
 import Hls from 'hls.js';
 
-export function StreamCard({stream, onShowDirectory, onDelete}: {
+export function StreamCard({stream, onShowDirectory, onDelete, onShare}: {
     stream: StreamInfo,
     onShowDirectory: (alias: string) => void,
-    onDelete: (stream: StreamInfo) => void
+    onDelete: (stream: StreamInfo) => void,
+    onShare: (stream: StreamInfo, username: string) => void
 }) {
     const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -52,6 +53,13 @@ export function StreamCard({stream, onShowDirectory, onDelete}: {
                 <button onClick={() => onShowDirectory(stream.alias)}>
                     <FolderOpen size={16} style={{marginRight: '0.5rem', verticalAlign: 'middle'}}/>
                     Show Directory
+                </button>
+                <button onClick={() => {
+                    const username = prompt("Enter the user login to share with:");
+                    if (username) onShare(stream, username);
+                }}>
+                    <Share2 size={16} style={{marginRight: '0.5rem', verticalAlign: 'middle'}}/>
+                    Share
                 </button>
                 <button onClick={() => onDelete(stream)} className="delete-btn">
                     <Trash2 size={16} style={{marginRight: '0.5rem', verticalAlign: 'middle'}}/>

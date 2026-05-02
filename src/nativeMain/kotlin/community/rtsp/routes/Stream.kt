@@ -1,6 +1,7 @@
 package community.rtsp.routes
 
 import community.rtsp.AddStreamRequest
+import community.rtsp.ShareStreamRequest
 import community.rtsp.auth.AuthRepository
 import community.rtsp.auth.UserSession
 import community.rtsp.dto.StreamDto.Companion.toDto
@@ -180,6 +181,44 @@ fun Route.streamRoutes(
             // Not owner: check if it's shared with this user
             authRepository.unshareStream(streamId, userId)
             call.respond(HttpStatusCode.OK, mapOf("message" to "Stream unshared"))
+        }
+    }
+
+    post("/api/streams/{id}/share") {
+        val session = call.principal<UserSession>()
+        val userId = session?.userId
+        if (userId == null) {
+            call.respond(HttpStatusCode.Unauthorized)
+            return@post
+        }
+
+        val streamId = call.parameters["id"]?.toLongOrNull()
+        if (streamId == null) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("message" to "Invalid stream ID"))
+            return@post
+        }
+
+        val request = try {
+            call.receive<ShareStreamRequest>()
+        } catch (e: Exception) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("message" to "Invalid request body"))
+            return@post
+        }
+
+        // Search for user by login
+        val targetUser = authRepository.getUserByUsername(request.username)
+        if (targetUser == null) {
+            // If not found, return info to front-end
+            call.respond(HttpStatusCode.NotFound, mapOf("message" to "User not found"))
+            return@post
+        }
+
+        try {
+            // If found, link stream with shared using stream_share table
+            authRepository.shareStream(streamId, targetUser.id)
+            call.respond(HttpStatusCode.OK, mapOf("message" to "Stream shared successfully"))
+        } catch (e: Exception) {
+            call.respond(HttpStatusCode.Conflict, mapOf("message" to "Already shared or database error"))
         }
     }
 }

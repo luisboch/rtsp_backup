@@ -47,6 +47,11 @@ data class AddStreamRequest(
     val rtspUrl: String
 )
 
+@Serializable
+data class ShareStreamRequest(
+    val username: String
+)
+
 @OptIn(ExperimentalForeignApi::class)
 fun main() {
     val host = getenv("HOST")?.toKString() ?: "0.0.0.0"

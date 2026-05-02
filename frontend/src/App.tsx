@@ -67,6 +67,25 @@ export function App() {
         }
     };
 
+    const handleShareStream = async (stream: StreamInfo, username: string) => {
+        try {
+            const response = await fetch(`/api/streams/${stream.id}/share`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username }),
+            });
+
+            const data = await response.json();
+            if (response.ok) {
+                alert('Stream shared successfully!');
+            } else {
+                alert(data.message || 'Failed to share stream');
+            }
+        } catch (err) {
+            alert('Connection error while sharing');
+        }
+    };
+
     useEffect(() => {
         fetch('/api/status')
             .then(res => {
@@ -173,6 +192,7 @@ export function App() {
                                 stream={stream}
                                 onShowDirectory={(alias) => setSelectedDirectory(alias)}
                                 onDelete={handleDeleteStream}
+                                onShare={handleShareStream}
                             />
                         ))}
                     </div>

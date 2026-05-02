@@ -29,6 +29,10 @@ export type NewStream = {
     rtspUrl: string
 }
 
+export type ShareStreamRequest = {
+    username: string
+}
+
 export type UserSession = {
     userId: number
     token: string
