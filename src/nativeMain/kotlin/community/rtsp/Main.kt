@@ -17,14 +17,28 @@ import io.ktor.server.engine.*
 import kotlinx.cinterop.*
 import platform.posix.*
 
+private var globalServer: ApplicationEngine? = null
+
 @OptIn(ExperimentalForeignApi::class)
 fun main() {
     val host = getenv("HOST")?.toKString() ?: "0.0.0.0"
     val port = getenv("PORT")?.toKString()?.toIntOrNull() ?: 8080
 
-    embeddedServer(CIO, host = host, port = port) {
+    val server = embeddedServer(CIO, host = host, port = port) {
         module()
-    }.start(wait = true)
+    }
+    globalServer = server
+
+    signal(SIGINT, staticCFunction<Int, Unit> {
+        println("\nStopping server...")
+        globalServer?.stop(1000, 5000)
+    })
+    signal(SIGTERM, staticCFunction<Int, Unit> {
+        println("\nStopping server (SIGTERM)...")
+        globalServer?.stop(1000, 5000)
+    })
+
+    server.start(wait = true)
 }
 
 @OptIn(ExperimentalForeignApi::class)

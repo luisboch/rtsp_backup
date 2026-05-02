@@ -93,5 +93,7 @@ fun Application.configureRouting(
             live(config, streamRepository)
             video(config, streamRepository)
         }
+
+        frontend("static")
     }
 }

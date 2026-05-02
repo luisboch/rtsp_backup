@@ -10,6 +10,9 @@ RUN npm run build
 FROM gradle:8.14-jdk21 AS backend-builder
 WORKDIR /app
 
+# Install dependencies for Kotlin/Native build
+RUN apt-get update && apt-get install -y libsqlite3-dev
+
 # 1. Copy only the files needed to download Gradle and plugins
 COPY gradlew .
 COPY gradle ./gradle
@@ -19,7 +22,10 @@ COPY build.gradle.kts settings.gradle.kts gradle.properties ./
 RUN ./gradlew --version --no-daemon
 
 # 3. Download dependencies
-RUN ./gradlew help --no-daemon
+RUN mkdir -p src/nativeMain/kotlin && \
+    echo "fun main() {}" > src/nativeMain/kotlin/dummy.kt && \
+    ./gradlew nativeBinaries --no-daemon || true && \
+    rm -rf src
 
 # 4. Now copy the actual source code
 COPY src ./src
@@ -28,20 +34,22 @@ COPY src ./src
 RUN ./gradlew nativeBinaries --no-daemon
 
 # Stage 3: Final image
-FROM alpine:latest
-# Install Java, ffmpeg, and libc compat for the native binary
-RUN apk add --no-cache openjdk21-jre-headless ffmpeg gcompat libstdc++
+FROM debian:bookworm-slim
+# Install runtime dependencies: libsqlite3, ffmpeg, and JRE (if needed)
+RUN apt-get update && apt-get install -y \
+    libsqlite3-0 \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
 # Copy the native executable from the backend-builder stage
-# The path might vary depending on the Gradle configuration, but usually it's under build/bin/native/releaseExecutable/
-COPY --from=backend-builder /app/build/bin/native/releaseExecutable/*.kexe ./rtsp-backup
+COPY --from=backend-builder /app/build/bin/native/releaseExecutable/rtsp_backup.kexe ./rtsp-backup
 
-# Copy the frontend build to a directory the app might use (e.g., static)
+# Copy the frontend build
 COPY --from=frontend-builder /app/frontend/dist ./static
 
-# Expose the port (default 8080 from Main.kt)
+# Expose the port
 EXPOSE 8080
 
 # Environment variables
@@ -52,5 +60,8 @@ ENV CONFIG_PATH=/app/conf/config.json
 
 # Create directories
 RUN mkdir -p /data /app/conf
+
+# Ensure the binary is executable
+RUN chmod +x ./rtsp-backup
 
 CMD ["./rtsp-backup"]
