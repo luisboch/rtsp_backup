@@ -27,7 +27,7 @@ fun Route.streamRoutes(
     get("/api/streams") {
         val userId = call.principal<UserSession>()!!.userId
         val streams = streamRepository.getStreamsForUser(userId)
-            .executeAsList().map { it.toDto() }
+            .executeAsList().map { it.toDto(userId) }
         call.respond(streams)
     }
 
@@ -91,7 +91,7 @@ fun Route.streamRoutes(
                     active = 1
                 )
                 backupService.startStreamRecording(streamObject)
-                call.respond(HttpStatusCode.Created, newStream.toDto())
+                call.respond(HttpStatusCode.Created, newStream.toDto(userId))
             } else {
                 call.respond(
                     HttpStatusCode.InternalServerError,
@@ -142,6 +142,12 @@ fun Route.streamRoutes(
         val streamId = call.parameters["id"]?.toLongOrNull()
         if (streamId == null) {
             call.respond(HttpStatusCode.BadRequest, mapOf("message" to "Invalid stream ID"))
+            return@post
+        }
+
+        val stream = streamRepository.getStreamById(streamId, userId)
+        if (stream == null || stream.owner_id != userId) {
+            call.respond(HttpStatusCode.Forbidden, mapOf("message" to "Only the owner can share this stream"))
             return@post
         }
 

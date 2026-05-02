@@ -12,24 +12,27 @@ data class StreamDto(
     val rtspUrl: String,
     val directory: String,
     val isFavorite: Boolean = false,
+    val isOwner: Boolean = false,
 ) {
     companion object {
-        fun GetStreamsForUser.toDto(): StreamDto = StreamDto(
+        fun GetStreamsForUser.toDto(currentUserId: Long): StreamDto = StreamDto(
             id = id,
             ownerId = owner_id,
             alias = alias,
             rtspUrl = rtsp_url,
             directory = directory,
-            isFavorite = is_favorite == 1L
+            isFavorite = is_favorite == 1L,
+            isOwner = owner_id == currentUserId
         )
 
-        fun Stream.toDto(isFavorite: Boolean = false): StreamDto = StreamDto(
+        fun Stream.toDto(currentUserId: Long, isFavorite: Boolean = false): StreamDto = StreamDto(
             id = id,
             ownerId = owner_id,
             alias = alias,
             rtspUrl = rtsp_url,
             directory = directory,
-            isFavorite = isFavorite
+            isFavorite = isFavorite,
+            isOwner = owner_id == currentUserId
         )
     }
 }

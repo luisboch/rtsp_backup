@@ -45,13 +45,15 @@ export function StreamCard({stream, onShowDirectory, onDelete, onShare, onToggle
                     <FolderOpen size={16} style={{marginRight: '0.5rem', verticalAlign: 'middle'}}/>
                     Show Directory
                 </button>
-                <button onClick={() => {
-                    const username = prompt("Enter the user login to share with:");
-                    if (username) onShare(stream, username);
-                }}>
-                    <Share2 size={16} style={{marginRight: '0.5rem', verticalAlign: 'middle'}}/>
-                    Share
-                </button>
+                {stream.isOwner && (
+                    <button onClick={() => {
+                        const username = prompt("Enter the user login to share with:");
+                        if (username) onShare(stream, username);
+                    }}>
+                        <Share2 size={16} style={{marginRight: '0.5rem', verticalAlign: 'middle'}}/>
+                        Share
+                    </button>
+                )}
                 <button onClick={() => onDelete(stream)} className="delete-btn">
                     <Trash2 size={16} style={{marginRight: '0.5rem', verticalAlign: 'middle'}}/>
                     Delete

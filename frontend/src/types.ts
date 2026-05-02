@@ -23,6 +23,7 @@ export type StreamInfo = {
     rtspUrl: string
     directory: string
     isFavorite: boolean
+    isOwner: boolean
 }
 
 export type NewStream = {

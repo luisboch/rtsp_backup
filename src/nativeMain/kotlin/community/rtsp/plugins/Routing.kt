@@ -74,12 +74,16 @@ fun Application.configureRouting(
                 call.response.headers.append("Cache-Control", "no-cache")
                 call.response.headers.append("Connection", "keep-alive")
                 call.respondBytesWriter(contentType = ContentType.Text.EventStream) {
-                    while (true) {
-                        val stats = systemStatsService.collect()
-                        val payload = Json.encodeToString(stats)
-                        writeStringUtf8("event: stats\ndata: $payload\n\n")
-                        flush()
-                        delay(call.request.queryParameters["interval"]?.toLongOrNull()?.milliseconds ?: 1.seconds)
+                    try {
+                        while (true) {
+                            val stats = systemStatsService.collect()
+                            val payload = Json.encodeToString(stats)
+                            writeStringUtf8("event: stats\ndata: $payload\n\n")
+                            flush()
+                            delay(call.request.queryParameters["interval"]?.toLongOrNull()?.milliseconds ?: 1.seconds)
+                        }
+                    } catch (e: Exception) {
+                        println("SSE error: ${e.message}")
                     }
                 }
             }
