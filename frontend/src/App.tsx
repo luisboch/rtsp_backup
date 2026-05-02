@@ -8,6 +8,7 @@ import {Plus} from "lucide-react";
 import {useAuth} from "./hooks/useAuth";
 import {useSystemStats} from "./hooks/useSystemStats";
 import {useStreams} from "./hooks/useStreams";
+import {StreamInfo} from "./types";
 
 
 export function App() {

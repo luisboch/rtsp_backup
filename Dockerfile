@@ -7,11 +7,24 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: Build the backend
-FROM gradle:8.10-jdk21 AS backend-builder
+FROM gradle:8.14-jdk21 AS backend-builder
 WORKDIR /app
-COPY . .
-# We build the native executable
-# We unset JAVA_HOME if it's pointing to a non-existent directory, or let Gradle use the one from the image
+
+# 1. Copy only the files needed to download Gradle and plugins
+COPY gradlew .
+COPY gradle ./gradle
+COPY build.gradle.kts settings.gradle.kts gradle.properties ./
+
+# 2. Trigger the download of the Gradle distribution and plugins
+RUN ./gradlew --version --no-daemon
+
+# 3. Download dependencies
+RUN ./gradlew help --no-daemon
+
+# 4. Now copy the actual source code
+COPY src ./src
+
+# 5. Build the native executable
 RUN ./gradlew nativeBinaries --no-daemon
 
 # Stage 3: Final image
