@@ -10,7 +10,7 @@ import kotlin.time.Duration.Companion.hours
 @OptIn(ExperimentalForeignApi::class)
 class CleanService(
     private val config: AppConfig,
-    private val authRepository: AuthRepository
+    private val streamRepository: StreamRepository
 ) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
@@ -41,7 +41,7 @@ class CleanService(
         val currentTime = time(null)
         val maxAgeSeconds = keepDays * 24 * 60 * 60
 
-        authRepository.getAllStreams().forEach { stream ->
+        streamRepository.getAllStreams().forEach { stream ->
             val backupDir = "${config.dataDir}/${stream.owner_id}/${stream.directory}/backup"
             println("Checking for old backups in: $backupDir")
             

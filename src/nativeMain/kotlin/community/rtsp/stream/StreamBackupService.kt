@@ -1,23 +1,22 @@
 package community.rtsp.stream
 
-import community.rtsp.auth.AuthRepository
 import community.rtsp.config.AppConfig
 import community.rtsp.db.Stream
 import community.rtsp.system.FfmpegCommandBuilder
+import kotlinx.cinterop.*
 import kotlinx.coroutines.*
 import platform.posix.*
-import kotlinx.cinterop.*
 
 @OptIn(ExperimentalForeignApi::class)
 class StreamBackupService(
     private val config: AppConfig,
-    private val authRepository: AuthRepository
+    private val streamRepository: StreamRepository,
 ) {
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private val recorders = mutableMapOf<String, Job>()
 
     fun start() {
-        authRepository.getAllStreams().forEach { stream ->
+        streamRepository.getAllStreams().forEach { stream ->
             startStreamRecording(stream)
         }
     }

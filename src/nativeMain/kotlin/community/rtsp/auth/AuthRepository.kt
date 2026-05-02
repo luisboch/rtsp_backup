@@ -1,10 +1,6 @@
 package community.rtsp.auth
 
 import community.rtsp.db.Database
-import community.rtsp.db.Stream
-import community.rtsp.db.UserQueries
-import community.rtsp.db.StreamQueries
-import community.rtsp.db.StreamShareQueries
 import community.rtsp.db.User
 
 class AuthRepository(
@@ -12,8 +8,6 @@ class AuthRepository(
     private val passwordHasher: PasswordHasher
 ) {
     private val userQueries = database.userQueries
-    private val streamQueries = database.streamQueries
-    private val streamShareQueries = database.streamShareQueries
 
     fun getUserByUsername(username: String): User? {
         return userQueries.getUserByUsername(username).executeAsOneOrNull()
@@ -39,38 +33,5 @@ class AuthRepository(
         } else {
             null
         }
-    }
-
-    // Stream access methods
-    fun getAllStreams() = streamQueries.getAllStreams().executeAsList()
-
-    fun getStreamsForUser(userId: Long) = streamQueries.getStreamsForUser(userId, userId)
-
-    fun addStream(ownerId: Long, alias: String, url: String, dir: String) {
-        streamQueries.insertStream(ownerId, alias, url, dir)
-    }
-
-    fun shareStream(streamId: Long, targetUserId: Long) {
-        streamShareQueries.shareStream(streamId, targetUserId)
-    }
-
-    fun unshareStream(streamId: Long, userId: Long) {
-        streamShareQueries.unshareStream(streamId, userId)
-    }
-
-    fun deleteAllShares(streamId: Long) {
-        streamShareQueries.deleteAllShares(streamId)
-    }
-
-    fun inactivateStream(streamId: Long) {
-        streamQueries.inactivateStream(streamId)
-    }
-
-    fun getStreamById(id: Long, userId: Long): Stream? {
-        return streamQueries.getStreamById(id, userId).executeAsOneOrNull()
-    }
-
-    fun getStreamByAlias(alias: String, userId: Long): Stream? {
-        return streamQueries.getStreamByAlias(alias, userId).executeAsOneOrNull()
     }
 }

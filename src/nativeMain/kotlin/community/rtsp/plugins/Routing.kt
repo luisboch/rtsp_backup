@@ -25,6 +25,7 @@ import kotlin.time.Duration.Companion.seconds
 fun Application.configureRouting(
     config: AppConfig,
     authRepository: AuthRepository,
+    streamRepository: StreamRepository,
     sessionService: SessionService,
     randomService: GenerateRandomService,
     backupService: StreamBackupService,
@@ -48,7 +49,7 @@ fun Application.configureRouting(
         }
 
         authenticate("auth-session") {
-            streamRoutes(authRepository, randomService, backupService)
+            streamRoutes(authRepository, streamRepository, randomService, backupService)
 
             get("/api/config") {
                 call.respond(config)
@@ -59,7 +60,7 @@ fun Application.configureRouting(
                 call.respond(
                     AppStatus(
                         recording = backupService.isRecording(),
-                        streamsConfigured = authRepository.getAllStreams().size,
+                        streamsConfigured = streamRepository.getAllStreams().size,
                         ffmpegAvailable = ffmpegCliService.isAvailable(),
                         diskUsedBytes = stats.diskUsedBytes,
                         diskTotalBytes = stats.diskTotalBytes,
@@ -83,10 +84,10 @@ fun Application.configureRouting(
                 }
             }
 
-            files(config, authRepository)
+            files(config, streamRepository)
 
-            live(config, authRepository)
-            video(config, authRepository)
+            live(config, streamRepository)
+            video(config, streamRepository)
         }
     }
 }

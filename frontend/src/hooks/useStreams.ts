@@ -86,6 +86,24 @@ export function useStreams(isAuthenticated: boolean, onUnauthorized: () => void)
         }
     };
 
+    const toggleFavorite = async (stream: StreamInfo) => {
+        try {
+            const response = await fetch(`/api/streams/${stream.id}/favorite`, {
+                method: stream.isFavorite ? 'DELETE' : 'POST',
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                throw new Error(data.message || 'Failed to toggle favorite');
+            }
+
+            // After toggling, we refresh to get the correct order
+            await fetchStreams();
+        } catch (err: any) {
+            setError(err.message);
+        }
+    };
+
     return {
         streams,
         error,
@@ -93,6 +111,7 @@ export function useStreams(isAuthenticated: boolean, onUnauthorized: () => void)
         addStream,
         deleteStream,
         shareStream,
+        toggleFavorite,
         refreshStreams: fetchStreams
     };
 }

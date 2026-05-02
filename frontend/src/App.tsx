@@ -15,7 +15,7 @@ export function App() {
     const onUnauthorized = useCallback(() => setIsAuthenticated(false), [setIsAuthenticated]);
 
     const { stats, status, error: statsError } = useSystemStats(isAuthenticated, onUnauthorized);
-    const { streams, error: streamsError, addStream, deleteStream, shareStream } = useStreams(isAuthenticated, onUnauthorized);
+    const { streams, error: streamsError, addStream, deleteStream, shareStream, toggleFavorite } = useStreams(isAuthenticated, onUnauthorized);
 
     const [selectedStream, setSelectedStream] = useState<StreamInfo | null>(null)
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -58,6 +58,7 @@ export function App() {
                                 onShowDirectory={(stream) => setSelectedStream(stream)}
                                 onDelete={deleteStream}
                                 onShare={shareStream}
+                                onToggleFavorite={toggleFavorite}
                             />
                         ))}
                     </div>

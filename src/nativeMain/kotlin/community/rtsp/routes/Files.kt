@@ -3,6 +3,7 @@ package community.rtsp.routes
 import community.rtsp.auth.AuthRepository
 import community.rtsp.auth.UserSession
 import community.rtsp.config.AppConfig
+import community.rtsp.stream.StreamRepository
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -12,7 +13,10 @@ import kotlinx.cinterop.*
 import platform.posix.*
 
 @OptIn(ExperimentalForeignApi::class)
-fun Route.files(config: AppConfig, authRepository: AuthRepository) {
+fun Route.files(
+    config: AppConfig,
+    streamRepository: StreamRepository,
+) {
     get("/api/files/{streamId}") {
         val userId = call.principal<UserSession>()!!.userId
         val streamId = call.parameters["streamId"]?.toLongOrNull()
@@ -22,7 +26,7 @@ fun Route.files(config: AppConfig, authRepository: AuthRepository) {
             return@get
         }
 
-        val stream = authRepository.getStreamById(streamId, userId)
+        val stream = streamRepository.getStreamById(streamId, userId)
         if (stream == null) {
             call.respond(HttpStatusCode.NoContent)
             return@get

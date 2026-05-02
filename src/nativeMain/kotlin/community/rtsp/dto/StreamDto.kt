@@ -1,5 +1,6 @@
 package community.rtsp.dto
 
+import community.rtsp.db.GetStreamsForUser
 import community.rtsp.db.Stream
 import kotlinx.serialization.Serializable
 
@@ -10,14 +11,25 @@ data class StreamDto(
     val alias: String,
     val rtspUrl: String,
     val directory: String,
+    val isFavorite: Boolean = false,
 ) {
     companion object {
-        fun Stream.toDto(): StreamDto = StreamDto(
+        fun GetStreamsForUser.toDto(): StreamDto = StreamDto(
             id = id,
             ownerId = owner_id,
             alias = alias,
             rtspUrl = rtsp_url,
-            directory = directory
+            directory = directory,
+            isFavorite = is_favorite == 1L
+        )
+
+        fun Stream.toDto(isFavorite: Boolean = false): StreamDto = StreamDto(
+            id = id,
+            ownerId = owner_id,
+            alias = alias,
+            rtspUrl = rtsp_url,
+            directory = directory,
+            isFavorite = isFavorite
         )
     }
 }

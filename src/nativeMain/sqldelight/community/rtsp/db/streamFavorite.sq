@@ -1,0 +1,19 @@
+CREATE TABLE stream_favorite (
+    user_id INTEGER NOT NULL,
+    stream_id INTEGER NOT NULL,
+    PRIMARY KEY (user_id, stream_id),
+    FOREIGN KEY (user_id) REFERENCES user(id),
+    FOREIGN KEY (stream_id) REFERENCES stream(id)
+);
+
+addFavorite:
+INSERT OR IGNORE INTO stream_favorite (user_id, stream_id)
+VALUES (?, ?);
+
+deleteFavorite:
+DELETE FROM stream_favorite
+WHERE user_id = ? AND stream_id = ?;
+
+isFavorite:
+SELECT COUNT(*) FROM stream_favorite
+WHERE user_id = ? AND stream_id = ?;

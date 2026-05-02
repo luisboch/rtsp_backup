@@ -13,17 +13,11 @@ INSERT INTO stream (owner_id, alias, rtsp_url, directory, active)
 VALUES (?, ?, ?, ?, 1);
 
 getStreamById:
-SELECT s.* FROM stream s
+SELECT s.*
+FROM stream s
 LEFT JOIN stream_share ss ON s.id = ss.stream_id
-WHERE id = :id AND (s.owner_id = :userId OR ss.user_id = :userId);
+WHERE s.id = :streamId AND (s.owner_id = :userId OR ss.user_id = :userId);
 
-getStreamsByOwner:
-SELECT * FROM stream
-WHERE owner_id = ?;
-
-deleteStream:
-DELETE FROM stream
-WHERE id = ?;
 
 inactivateStream:
 UPDATE stream SET active = 0 WHERE id = ?;
@@ -32,11 +26,16 @@ getAllStreams:
 SELECT * FROM stream WHERE active = 1;
 
 getStreamsForUser:
-SELECT s.* FROM stream s
+SELECT s.*,
+       CASE WHEN sf.stream_id IS NOT NULL THEN 1 ELSE 0 END AS is_favorite
+FROM stream s
 LEFT JOIN stream_share ss ON s.id = ss.stream_id
-WHERE (s.owner_id = ? OR ss.user_id = ?) AND s.active = 1;
+LEFT JOIN stream_favorite sf ON s.id = sf.stream_id AND sf.user_id = ?
+WHERE (s.owner_id = ? OR ss.user_id = ?) AND s.active = 1
+ORDER BY is_favorite DESC, s.id DESC;
 
 getStreamByAlias:
-SELECT s.* FROM stream s
+SELECT s.*
+FROM stream s
 LEFT JOIN stream_share ss ON s.id = ss.stream_id
 WHERE alias = :alias AND (s.owner_id = :userId OR ss.user_id = :userId);

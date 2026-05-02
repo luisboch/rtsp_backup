@@ -22,6 +22,7 @@ export type StreamInfo = {
     alias: string
     rtspUrl: string
     directory: string
+    isFavorite: boolean
 }
 
 export type NewStream = {

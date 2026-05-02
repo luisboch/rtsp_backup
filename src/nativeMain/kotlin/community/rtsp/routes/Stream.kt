@@ -1,13 +1,12 @@
 package community.rtsp.routes
 
-import community.rtsp.dto.AddStreamRequest
-import community.rtsp.dto.ShareStreamRequest
 import community.rtsp.auth.AuthRepository
 import community.rtsp.auth.UserSession
+import community.rtsp.dto.AddStreamRequest
+import community.rtsp.dto.ShareStreamRequest
 import community.rtsp.dto.StreamDto.Companion.toDto
-import community.rtsp.routes.util.bufferedRead
 import community.rtsp.stream.StreamBackupService
-import community.rtsp.system.FfmpegCommandBuilder
+import community.rtsp.stream.StreamRepository
 import community.rtsp.util.GenerateRandomService
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -15,24 +14,45 @@ import io.ktor.server.auth.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
-import platform.posix.FILE
-import platform.posix.pclose
-import platform.posix.popen
 
 
 @OptIn(ExperimentalForeignApi::class)
 fun Route.streamRoutes(
     authRepository: AuthRepository,
+    streamRepository: StreamRepository,
     randomService: GenerateRandomService,
     backupService: StreamBackupService,
 ) {
     get("/api/streams") {
         val userId = call.principal<UserSession>()!!.userId
-        val streams = authRepository.getStreamsForUser(userId)
-            .executeAsList().map { stream -> stream.toDto() }
+        val streams = streamRepository.getStreamsForUser(userId)
+            .executeAsList().map { it.toDto() }
         call.respond(streams)
+    }
+
+    post("/api/streams/{id}/favorite") {
+        val userId = call.principal<UserSession>()!!.userId
+        val streamId = call.parameters["id"]?.toLongOrNull()
+        if (streamId == null) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("message" to "Invalid stream ID"))
+            return@post
+        }
+
+        streamRepository.addFavorite(userId, streamId)
+        call.respond(HttpStatusCode.OK, mapOf("message" to "Stream added to favorites"))
+    }
+
+    delete("/api/streams/{id}/favorite") {
+        val userId = call.principal<UserSession>()!!.userId
+        val streamId = call.parameters["id"]?.toLongOrNull()
+        if (streamId == null) {
+            call.respond(HttpStatusCode.BadRequest, mapOf("message" to "Invalid stream ID"))
+            return@delete
+        }
+
+        streamRepository.deleteFavorite(userId, streamId)
+        call.respond(HttpStatusCode.OK, mapOf("message" to "Stream removed from favorites"))
     }
 
     post("/api/streams") {
@@ -52,16 +72,25 @@ fun Route.streamRoutes(
 
         try {
             val directory = randomService.generate(16)
-            authRepository.addStream(
+            streamRepository.addStream(
                 ownerId = userId,
                 alias = request.alias,
                 url = request.rtspUrl,
                 dir = directory
             )
 
-            val newStream = authRepository.getStreamByAlias(request.alias, userId)
+            val newStream = streamRepository.getStreamByAlias(request.alias, userId)
             if (newStream != null) {
-                backupService.startStreamRecording(newStream)
+                // backupService needs the base Stream object
+                val streamObject = community.rtsp.db.Stream(
+                    id = newStream.id,
+                    owner_id = newStream.owner_id,
+                    alias = newStream.alias,
+                    rtsp_url = newStream.rtsp_url,
+                    directory = newStream.directory,
+                    active = 1
+                )
+                backupService.startStreamRecording(streamObject)
                 call.respond(HttpStatusCode.Created, newStream.toDto())
             } else {
                 call.respond(
@@ -88,7 +117,7 @@ fun Route.streamRoutes(
             return@delete
         }
 
-        val stream = authRepository.getStreamById(streamId, userId)
+        val stream = streamRepository.getStreamById(streamId, userId)
         if (stream == null) {
             call.respond(HttpStatusCode.NoContent, mapOf("message" to "Stream not found"))
             return@delete
@@ -96,13 +125,13 @@ fun Route.streamRoutes(
 
         if (stream.owner_id == userId) {
             // Owner: delete from shared and inactivate
-            authRepository.deleteAllShares(streamId)
-            authRepository.inactivateStream(streamId)
+            streamRepository.deleteAllShares(streamId)
+            streamRepository.inactivateStream(streamId)
             backupService.stopStreamRecording(stream.alias)
             call.respond(HttpStatusCode.OK, mapOf("message" to "Stream inactivated"))
         } else {
             // Not owner: check if it's shared with this user
-            authRepository.unshareStream(streamId, userId)
+            streamRepository.unshareStream(streamId, userId)
             call.respond(HttpStatusCode.OK, mapOf("message" to "Stream unshared"))
         }
     }
@@ -133,7 +162,7 @@ fun Route.streamRoutes(
 
         try {
             // If found, link stream with shared using stream_share table
-            authRepository.shareStream(streamId, targetUser.id)
+            streamRepository.shareStream(streamId, targetUser.id)
             call.respond(HttpStatusCode.OK, mapOf("message" to "Stream shared successfully"))
         } catch (e: Exception) {
             call.respond(HttpStatusCode.Conflict, mapOf("message" to "Already shared or database error"))

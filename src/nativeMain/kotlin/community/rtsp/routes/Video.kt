@@ -1,9 +1,9 @@
 package community.rtsp.routes
 
-import community.rtsp.auth.AuthRepository
 import community.rtsp.auth.UserSession
 import community.rtsp.config.AppConfig
 import community.rtsp.routes.util.streamFileToChannel
+import community.rtsp.stream.StreamRepository
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.auth.*
@@ -15,7 +15,10 @@ import platform.posix.access
 import platform.posix.fopen
 
 @OptIn(ExperimentalForeignApi::class)
-fun Route.video(config: AppConfig, authRepository: AuthRepository) {
+fun Route.video(
+    config: AppConfig,
+    streamRepository: StreamRepository
+) {
     get("/api/video/{streamId}/{path...}") {
         val userId = call.principal<UserSession>()!!.userId
         val streamId = call.parameters["streamId"]?.toLongOrNull()
@@ -25,7 +28,7 @@ fun Route.video(config: AppConfig, authRepository: AuthRepository) {
             return@get
         }
 
-        val stream = authRepository.getStreamById(streamId, userId)
+        val stream = streamRepository.getStreamById(streamId, userId)
         if (stream == null) {
             call.respond(HttpStatusCode.NotFound)
             return@get

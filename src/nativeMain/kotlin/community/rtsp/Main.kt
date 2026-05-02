@@ -7,6 +7,7 @@ import community.rtsp.plugins.configureSecurity
 import community.rtsp.plugins.configureSerialization
 import community.rtsp.stream.CleanService
 import community.rtsp.stream.StreamBackupService
+import community.rtsp.stream.StreamRepository
 import community.rtsp.system.FfmpegCliService
 import community.rtsp.system.SystemStatsService
 import community.rtsp.util.GenerateRandomService
@@ -32,15 +33,16 @@ fun Application.module() {
     val dbManager = DatabaseManager(config)
     val database = dbManager.database
 
-    val authRepository = AuthRepository(database, community.rtsp.auth.PasswordHasher())
+    val authRepository = AuthRepository(database, PasswordHasher())
+    val streamRepository = StreamRepository(database)
     val sessionService = SessionService(database.sessionQueries)
     val sessionCleanupService = SessionCleanupService(sessionService)
     val randomService = GenerateRandomService()
 
     val systemStatsService = SystemStatsService()
     val ffmpegCliService = FfmpegCliService()
-    val backupService = StreamBackupService(config, authRepository)
-    val cleanService = CleanService(config, authRepository)
+    val backupService = StreamBackupService(config, streamRepository)
+    val cleanService = CleanService(config, streamRepository)
 
     backupService.start()
     cleanService.start()
@@ -58,6 +60,7 @@ fun Application.module() {
     configureRouting(
         config,
         authRepository,
+        streamRepository,
         sessionService,
         randomService,
         backupService,
