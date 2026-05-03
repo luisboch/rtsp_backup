@@ -68,6 +68,11 @@ class FfmpegCommandBuilder {
         args.add(if (enabled) "1" else "0")
     }
 
+    fun resetTimestamps(enabled: Boolean) = apply {
+        args.add("-reset_timestamps")
+        args.add(if (enabled) "1" else "0")
+    }
+
     fun strftime(enabled: Boolean) = apply {
         args.add("-strftime")
         args.add(if (enabled) "1" else "0")

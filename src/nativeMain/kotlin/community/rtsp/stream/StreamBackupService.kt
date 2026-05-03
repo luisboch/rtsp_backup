@@ -90,6 +90,7 @@ class StreamBackupService(
             .segmentTime(segmentTime)
             .segmentAtClockTime(true)
             .strftime(true)
+            .resetTimestamps(true)
             .output("$backupDir/${stream.directory}_%Y-%m-%d_%H-%M-%S.mp4")
             .build()
 
