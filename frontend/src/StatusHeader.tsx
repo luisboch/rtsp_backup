@@ -8,6 +8,7 @@ export function StatusHeader({status, stats, onLogout}: {
     onLogout?: () => void
 }) {
     const [now, setNow] = useState(Date.now())
+    const [expandedItem, setExpandedItem] = useState<string | null>(null)
 
     useEffect(
         () => {
@@ -19,6 +20,13 @@ export function StatusHeader({status, stats, onLogout}: {
         },
         []
     )
+
+    useEffect(() => {
+        if (!expandedItem) return
+        const handler = () => setExpandedItem(null)
+        document.addEventListener('click', handler)
+        return () => document.removeEventListener('click', handler)
+    }, [expandedItem])
 
     const staleness = status ? (now - status.timestamp) / 1000 : Infinity
 
@@ -49,35 +57,47 @@ export function StatusHeader({status, stats, onLogout}: {
         [staleness]
     )
 
+    const toggleExpand = (e: React.MouseEvent, item: string) => {
+        e.stopPropagation()
+        setExpandedItem(expandedItem === item ? null : item)
+    }
+
     return (
         <header>
             <h1 style={{margin: 0, fontSize: '1.5rem'}}>RTSP Backup</h1>
             <div className="status-group">
-                <div className="status-item">
+                <div 
+                    className={`status-item ${expandedItem === 'recording' ? 'expanded' : ''}`}
+                    onClick={(e) => toggleExpand(e, 'recording')}
+                >
                     <Activity size={18} color={status?.recording ? '#22c55e' : '#94a3b8'}/>
                     <span>Recording: {status?.recording ? 'Active' : 'Idle'}</span>
                 </div>
-                <div className="status-item">
+                <div 
+                    className={`status-item ${expandedItem === 'streams' ? 'expanded' : ''}`}
+                    onClick={(e) => toggleExpand(e, 'streams')}
+                >
                     <Layers size={18} color="#3b82f6"/>
                     <span>Streams: {status?.streamsConfigured ?? 0}</span>
                 </div>
-                <div className="status-item">
-                    {status?.ffmpegAvailable ? (
-                        <CheckCircle2 size={18} color="#22c55e"/>
-                    ) : (
-                        <AlertCircle size={18} color="#ef4444"/>
-                    )}
-                    <span>FFmpeg</span>
-                </div>
-                <div className="status-item">
+                <div 
+                    className={`status-item ${expandedItem === 'disk' ? 'expanded' : ''}`}
+                    onClick={(e) => toggleExpand(e, 'disk')}
+                >
                     <HardDrive size={18} color="#8b5cf6"/>
                     <span>Disk: {diskUsage}</span>
                 </div>
-                <div className="status-item">
+                <div 
+                    className={`status-item ${expandedItem === 'cpu' ? 'expanded' : ''}`}
+                    onClick={(e) => toggleExpand(e, 'cpu')}
+                >
                     <Cpu size={18} color="#f59e0b"/>
                     <span>CPU: {stats?.cpuLoadPercent ?? 0}%</span>
                 </div>
-                <div className="status-item">
+                <div 
+                    className={`status-item ${expandedItem === 'clock' ? 'expanded' : ''}`}
+                    onClick={(e) => toggleExpand(e, 'clock')}
+                >
                     <Clock size={18} color={clockColor}/>
                     <span>{status ? new Date(status.timestamp).toLocaleTimeString() : '--:--:--'}</span>
                 </div>
