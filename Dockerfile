@@ -34,7 +34,7 @@ COPY src ./src
 RUN ./gradlew nativeBinaries --no-daemon
 
 # Stage 3: Final image
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 # Install runtime dependencies: libsqlite3, ffmpeg, and JRE (if needed)
 RUN apt-get update && apt-get install -y \
     libsqlite3-0 \
