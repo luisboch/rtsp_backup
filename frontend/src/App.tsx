@@ -8,6 +8,8 @@ import {Plus} from "lucide-react";
 import {useAuth} from "./hooks/useAuth";
 import {useSystemStats} from "./hooks/useSystemStats";
 import {useStreams} from "./hooks/useStreams";
+import {useGridColumns} from "./hooks/useGridColumns";
+import {ColumnToggler} from "./components/ColumnToggler";
 import {StreamInfo} from "./types";
 
 
@@ -17,6 +19,7 @@ export function App() {
 
     const { stats, status, error: statsError } = useSystemStats(isAuthenticated, onUnauthorized);
     const { streams, error: streamsError, addStream, deleteStream, shareStream, toggleFavorite } = useStreams(isAuthenticated, onUnauthorized);
+    const { columns, toggleColumns } = useGridColumns(3);
 
     const [selectedStream, setSelectedStream] = useState<StreamInfo | null>(null)
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -45,13 +48,17 @@ export function App() {
                 <DirectoryView stream={selectedStream} onClose={() => setSelectedStream(null)}/>
             ) : (
                 <>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem', gap: '0.5rem' }}>
                         <button onClick={() => setIsAddModalOpen(true)} className="add-stream-btn">
                             <Plus size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
                             Add Stream
                         </button>
+                        <ColumnToggler columns={columns} onClick={toggleColumns} />
                     </div>
-                    <div className="streams-grid">
+                    <div className="streams-grid" style={{ 
+                        gridTemplateColumns: `repeat(${columns}, 1fr)`,
+                        gap: '0'
+                    }}>
                         {streams.map(stream => (
                             <StreamCard
                                 key={stream.id}

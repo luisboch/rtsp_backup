@@ -90,7 +90,6 @@ header {
 
 .video-container {
   background: #000;
-  border-radius: 8px;
   aspect-ratio: 16/9;
   display: flex;
   align-items: center;
