@@ -4,12 +4,13 @@ import {DirectoryView} from "./DirectoryView";
 import {StatusHeader} from "./StatusHeader";
 import {Login} from "./Login";
 import {AddStreamModal} from "./AddStreamModal";
-import {Plus} from "lucide-react";
+import {Plus, Maximize2} from "lucide-react";
 import {useAuth} from "./hooks/useAuth";
 import {useSystemStats} from "./hooks/useSystemStats";
 import {useStreams} from "./hooks/useStreams";
 import {useGridColumns} from "./hooks/useGridColumns";
 import {ColumnToggler} from "./components/ColumnToggler";
+import {FullscreenFavorites} from "./components/FullscreenFavorites";
 import {StreamInfo} from "./types";
 
 
@@ -23,6 +24,7 @@ export function App() {
 
     const [selectedStream, setSelectedStream] = useState<StreamInfo | null>(null)
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+    const [isFullscreenFavorites, setIsFullscreenFavorites] = useState(false)
 
     const error = statsError || streamsError;
 
@@ -30,6 +32,7 @@ export function App() {
         await logout();
         setSelectedStream(null);
         setIsAddModalOpen(false);
+        setIsFullscreenFavorites(false);
     }, [logout]);
 
     if (isCheckingAuth) {
@@ -46,9 +49,22 @@ export function App() {
 
             {selectedStream ? (
                 <DirectoryView stream={selectedStream} onClose={() => setSelectedStream(null)}/>
+            ) : isFullscreenFavorites ? (
+                <FullscreenFavorites 
+                    streams={streams} 
+                    columns={columns} 
+                    onClose={() => setIsFullscreenFavorites(false)} 
+                />
             ) : (
                 <>
                     <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem', gap: '0.5rem' }}>
+                        <button 
+                            onClick={() => setIsFullscreenFavorites(true)} 
+                            className="fullscreen-favorites-btn"
+                            title="Fullscreen Favorites"
+                        >
+                            <Maximize2 size={18} />
+                        </button>
                         <button onClick={() => setIsAddModalOpen(true)} className="add-stream-btn">
                             <Plus size={18} style={{ marginRight: '0.5rem', verticalAlign: 'middle' }} />
                             Add Stream
@@ -57,7 +73,8 @@ export function App() {
                     </div>
                     <div className="streams-grid" style={{ 
                         gridTemplateColumns: `repeat(${columns}, 1fr)`,
-                        gap: '0'
+                        gap: '0',
+                        maxWidth: 'none'
                     }}>
                         {streams.map(stream => (
                             <StreamCard
@@ -81,22 +98,6 @@ export function App() {
             )}
 
             {error ? <p className="error" style={{marginTop: '2rem'}}>{error}</p> : null}
-            <style>{`
-                .add-stream-btn {
-                    background-color: #10b981;
-                    color: white;
-                    border: none;
-                    padding: 0.5rem 1rem;
-                    border-radius: 4px;
-                    cursor: pointer;
-                    font-weight: 500;
-                    display: flex;
-                    align-items: center;
-                }
-                .add-stream-btn:hover {
-                    background-color: #059669;
-                }
-            `}</style>
         </main>
     )
 }
