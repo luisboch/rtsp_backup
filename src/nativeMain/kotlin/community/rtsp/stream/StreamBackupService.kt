@@ -3,6 +3,7 @@ package community.rtsp.stream
 import community.rtsp.config.AppConfig
 import community.rtsp.db.Stream
 import community.rtsp.system.FfmpegCommandBuilder
+import io.ktor.util.date.getTimeMillis
 import kotlinx.cinterop.*
 import kotlinx.coroutines.*
 import platform.posix.*
@@ -34,19 +35,36 @@ class StreamBackupService(
     }
 
     private suspend fun CoroutineScope.runRecorder(stream: Stream) {
+        val restartIntervalMs = 2 * 60 * 60 * 1000L // 2 hours
+
         while (isActive) {
             val pid = startFfmpeg(stream)
             if (pid > 0) {
+                val startTime = getTimeMillis()
                 try {
-                    // We wait indefinitely while the process is running.
-                    // If it dies, we restart it.
+                    // Wait while the process is running.
+                    // If it dies or 4 hours pass, we restart it.
                     while (isActive) {
+                        val elapsed = getTimeMillis() - startTime
+                        val shouldRestart = elapsed >= restartIntervalMs
+
                         val finished = memScoped {
                             val status = alloc<IntVar>()
                             val res = waitpid(pid, status.ptr, WNOHANG)
                             if (res == pid || (res == -1 && errno == ECHILD)) true else false
                         }
-                        if (finished) break
+
+                        if (finished || shouldRestart) {
+                            if (shouldRestart && !finished) {
+                                kill(pid, SIGTERM)
+                                // Wait for process to actually terminate
+                                memScoped {
+                                    val status = alloc<IntVar>()
+                                    waitpid(pid, status.ptr, 0)
+                                }
+                            }
+                            break
+                        }
                         delay(5000)
                     }
                 } catch (e: CancellationException) {
